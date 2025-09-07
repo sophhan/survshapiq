@@ -10,23 +10,23 @@ set.seed(123)
 n <- 5000
 covs <- data.frame(
   id = 1:n,
-  age = rnorm(n, mean = 0, sd = 1),
-  treatment = rnorm(n, mean = 0, sd = 1),
-  bmi = rnorm(n, mean = 0, sd = 1)
+  x1 = rnorm(n, mean = 0, sd = 1),
+  x2 = rnorm(n, mean = 0, sd = 1),
+  x3 = rnorm(n, mean = 0, sd = 1)
 )
 betas <- data.frame(lambda = rep(0.03, n),
-                    age = rep(0.8, n), 
-                    bmi = rep(0.5, n), 
-                    treatment = rep(0.9, n),
-                    age_treatment = rep(-0.6, n)
+                    x1 = rep(0.8, n), 
+                    x2 = rep(0.5, n), 
+                    x3 = rep(0.9, n),
+                    x1_x3 = rep(-0.6, n)
 )
 # Step 2: Simulate data
 hazard_fun <- function(t, x, betas = beta, ...) {
   # linear predictor with interaction
-  lin_pred <- betas["age"] * x["age"] +
-    betas["bmi"] * x["bmi"] +
-    betas["treatment"] * x["treatment"] +
-    betas["age_treatment"] * x["age"] * x["treatment"] 
+  lin_pred <- betas["x1"] * x["x1"] +
+    betas["x2"] * x["x2"] +
+    betas["x3"] * x["x3"] +
+    betas["x1_x3"] * x["x1"] * x["x3"]
   # hazard function
   return(betas["lambda"] * exp(lin_pred))
 }
@@ -49,26 +49,26 @@ set.seed(123)
 n <- 5000
 covs <- data.frame(
   id = 1:n,
-  age = rnorm(n, 0, 1),
-  treatment = rnorm(n, 0, 1),
-  bmi = rnorm(n, 0, 1)
+  x1 = rnorm(n, 0, 1),
+  x2 = rnorm(n, 0, 1),
+  x3 = rnorm(n, 0, 1)
 )
 
 # Start with milder coefficients to reduce extreme heterogeneity
-betas <- c(lambda = 0.03,    
-           age = 0.8,
-           age_t = -1.2,
-           bmi = 0.5,
-           treatment = 0.9,
-           age_treatment = -0.6)  
+betas <- c(lambda = 0.03,
+           x1 = 0.8,
+           x1_t = -1.2,
+           x2 = 0.5,
+           x3 = 0.9,
+           x1_x3 = -0.6)
 
 # Hazard function: time-dependent PH via log(t+1)
 hazard_fun <- function(t, x, betas, ...) {
-  lp <- betas["age"] * x["age"] +
-        betas["age_t"] * x["age"] * log(t + 1)
-        betas["bmi"] * x["bmi"] +
-        betas["treatment"] * x["treatment"] +
-        betas["age_treatment"] * x["age"] * x["treatment"] 
+  lp <- betas["x1"] * x["x1"] +
+        betas["x1_t"] * x["x1"] * log(t + 1) +
+        betas["x2"] * x["x2"] +
+        betas["x3"] * x["x3"] +
+        betas["x1_x3"] * x["x1"] * x["x3"]
   betas["lambda"] * exp(lp)
 }
 
@@ -88,7 +88,6 @@ table(round(simdata_td_full$eventtime,0))
 write.csv(simdata_td_full, "/home/slangbei/survshapiq/survshapiq/simulation/simdata_linear_td_main.csv", row.names = F)
 
 
-
 ################ LINEAR MAIN EFFECTS AND LINEAR INTERACTIONS
 ###### TIME-DEPENDENCE IN INTERACTIONS
 set.seed(123)
@@ -96,26 +95,26 @@ set.seed(123)
 n <- 5000
 covs <- data.frame(
   id = 1:n,
-  age = rnorm(n, 0, 1),
-  treatment = rnorm(n, 0, 1),
-  bmi = rnorm(n, 0, 1)
+  x1 = rnorm(n, 0, 1),
+  x2 = rnorm(n, 0, 1),
+  x3 = rnorm(n, 0, 1)
 )
 
 # Start with milder coefficients to reduce extreme heterogeneity
 betas <- c(lambda = 0.03,    
-           age = 0.8,
-           bmi = 0.5,
-           treatment = 0.9,
-           age_treatment = -0.6,
-           age_treatment_t = -0.4)  
+           x1 = 0.8,
+           x2 = 0.5,
+           x3 = 0.9,
+           x1_x2 = -0.6,
+           x1_x2_t = -0.4)  
 
 # Hazard function: time-dependent PH via log(t+1)
 hazard_fun <- function(t, x, betas, ...) {
-  lp <- betas["age"] * x["age"] +
-        betas["bmi"] * x["bmi"] +
-        betas["treatment"] * x["treatment"] +
-        betas["age_treatment"] * x["age"] * x["treatment"] +
-        betas["age_treatment_t"] * x["age"] * x["treatment"] * log(t + 1)
+  lp <- betas["x1"] * x["x1"] +
+        betas["x2"] * x["x2"] +
+        betas["x3"] * x["x3"] +
+        betas["x1_x2"] * x["x1"] * x["x2"] +
+        betas["x1_x2_t"] * x["x1"] * x["x2"] * log(t + 1)
   betas["lambda"] * exp(lp)
 }
 
@@ -266,7 +265,7 @@ betas <- c(
   # main effects
   x1_lin   = 0.2,
   x1_quad  = -0.3,   # nonlinear curvature
-  td_x1    = -0.1,   # time-dependent slope for x1
+  td_x1    = -0.4,   # time-dependent slope for x1
   x2_s     = 0.5,    # nonlinear S-shape
   x3_lin   = -0.4,   # treatment effect
   # interactions
@@ -313,9 +312,7 @@ head(simdata_genadd_full)
 table(round(simdata_genadd_full$eventtime, 0))
 
 # Step 6: Export to csv
-write.csv(simdata_genadd_full, 
-          "/home/slangbei/survshapiq/survshapiq/simulation/simdata_genadd_td_main.csv", 
-          row.names = FALSE)
+write.csv(simdata_genadd_full, "/home/slangbei/survshapiq/survshapiq/simulation/simdata_genadd_td_main.csv", row.names = FALSE)
 
 
 
@@ -342,7 +339,7 @@ betas <- c(
   x3_lin     = -0.4,   # treatment effect
   # interactions
   x1x2_lin   = 0.2,
-  td_x1x2    = -0.1,   # time-dependent slope for x1*x2
+  td_x1x2    = -0.4,   # time-dependent slope for x1*x2
   x1x3_int   = 0.3
 )
 
