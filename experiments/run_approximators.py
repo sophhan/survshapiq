@@ -93,7 +93,7 @@ result.to_csv(f'results/{ds_name}_approximators.csv', index=False)
 # %%
 ax = sns.lineplot(result, x="budget", y="error", hue="approximator")
 ax.set_xscale('log', base=2)
-# ax.set_yscale('log', base=2)
+ax.set_yscale('log', base=2)
 plt.grid(True, which="both", ls="--")
 plt.title(f'dataset = {ds_name} | benchmark of approximators (k-SII)')
 plt.tight_layout()
