@@ -1,10 +1,7 @@
 # import libraries
 import numpy as np
 import pandas as pd
-import math
 import matplotlib.pyplot as plt
-from sksurv.preprocessing import OneHotEncoder
-from sksurv.ensemble import RandomSurvivalForest
 from sksurv.ensemble import GradientBoostingSurvivalAnalysis
 from sksurv.linear_model import CoxPHSurvivalAnalysis
 from sksurv.metrics import integrated_brier_score
@@ -14,14 +11,21 @@ import importlib
 import simulation.survshapiq_func as survshapiq_func
 importlib.reload(survshapiq_func)
 
-################ LINEAR MAIN EFFECTS AND LINEAR INTERACTIONS
-###### TIME-INDEPENDENCE 
-# Load simulated data DataFrame
-simdata_linear_ti = pd.read_csv("/home/slangbei/survshapiq/survshapiq/simulation/simdata_linear_ti.csv")
+# define paths
+path_data = "/home/slangbei/survshapiq/survshapiq/simulation/data"
+path_plots = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory"
+path_plots_combined = "/home/slangbei/survshapiq/survshapiq/simulation/plots_combined"
+
+#---------------------------
+# 1) Linear G(t|x), TI (no interactions)
+#---------------------------
+
+# load simulated data dataframe
+simdata_linear_ti = pd.read_csv(f"{path_data}/1_simdata_linear_ti.csv")
 print(simdata_linear_ti.head())
 simdata_linear_ti
 
-# Convert eventtime and status columns to a structured array
+# convert eventtime and status columns to a structured array
 data_y_linear_ti, data_x_linear_ti_df = survshapiq_func.prepare_survival_data(simdata_linear_ti)
 print(data_y_linear_ti)
 print(data_x_linear_ti_df.head())
@@ -33,40 +37,35 @@ X_train_linear_ti, X_test_linear_ti, y_train_linear_ti, y_test_linear_ti = train
     stratify=None    
 )
 
-# Fit GradientBoostingSurvivalAnalysis
+# fit GradientBoostingSurvivalAnalysis
 model_gbsa_linear_ti = GradientBoostingSurvivalAnalysis()
 model_gbsa_linear_ti.fit(X_train_linear_ti, y_train_linear_ti)
 print(f'C-index (train): {model_gbsa_linear_ti.score(X_test_linear_ti, y_test_linear_ti).item():0.3f}')
 ibs_gbsa_linear_ti = survshapiq_func.compute_integrated_brier(y_test_linear_ti, X_test_linear_ti, model_gbsa_linear_ti, min_time = 0.02, max_time = 69)
 print(f'Integrated Brier Score (train): {ibs_gbsa_linear_ti:0.3f}')
 
-# Fit CoxPH
+# fit CoxPH
 model_cox_linear_ti = CoxPHSurvivalAnalysis()
 model_cox_linear_ti.fit(X_train_linear_ti, y_train_linear_ti)
 print(f'C-index (train): {model_cox_linear_ti.score(X_test_linear_ti, y_test_linear_ti).item():0.3f}')
 ibs_cox_linear_ti = survshapiq_func.compute_integrated_brier(y_test_linear_ti, X_test_linear_ti, model_cox_linear_ti, min_time = 0.02, max_time = 69)
 print(f'Integrated Brier Score (train): {ibs_cox_linear_ti:0.3f}')
 
-# Create data point for explanation
-idx = 10
+# create data point for explanation
+idx = 7
 x_new_linear_ti = data_x_linear_ti[[idx]]
-#x_new_ti = data_x_ti[1:9]
 print(x_new_linear_ti)
 
 ###### GROUND TRUTH HAZARD
-# Define the hazard function
+# define the hazard function
 def hazard_func_linear_ti(t, x1, x2, x3):
-    """
-    Example hazard function that depends on time, age, bmi, and treatment.
-    This is a placeholder; replace with the actual hazard function.
-    """
-    return 0.03 * np.exp((0.8 * x1) + (0.5 * x2) + (0.9 * x3) + (-0.6 * x1 * x3))
+    return 0.03 * np.exp((0.4 * x1) - (0.8 * x2) - (0.6 * x3))
 
-
-# Explain the first row of x_new for every third time point
-# Wrap the hazard function
+# explain 
+# wrap the hazard function
 def hazard_wrap_linear_ti(X, t):
     return survshapiq_func.hazard_matrix(X, hazard_func_linear_ti, t)
+
 # exact
 explanation_linear_ti_haz = survshapiq_func.survshapiq_ground_truth(data_x_linear_ti, 
                                                             x_new_linear_ti, 
@@ -74,6 +73,7 @@ explanation_linear_ti_haz = survshapiq_func.survshapiq_ground_truth(data_x_linea
                                                             times=model_gbsa_linear_ti.unique_times_[::5], 
                                                             budget=2**8, 
                                                             max_order=2, 
+                                                            index= "k-SII",
                                                             exact=True,
                                                             feature_names = data_x_linear_ti_df.columns)
 
@@ -81,31 +81,29 @@ survshapiq_func.plot_interact(explanations_all = explanation_linear_ti_haz,
                               model = None,
                               times=model_gbsa_linear_ti.unique_times_[::5], 
                               x_new = x_new_linear_ti, 
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_gt_linear_ti_haz.pdf",
+                              save_path = f"{path_plots}/1_linear_ti/plot_gt_linear_ti_haz.pdf",
                               data_x = data_x_linear_ti,
                               survival_fn = hazard_wrap_linear_ti,
+                              compare_plots="Diff",
                               idx_plot=idx, 
                               ylabel="Attribution $h(t|x)$",
                               label_fontsize=16,
                               tick_fontsize=14,
                               figsize=(10,6),
                               smooth=True,
-                              smooth_window=200,
+                              smooth_window=50,
                               smooth_poly=1) 
 
 ###### GROUND TRUTH LOG HAZARD
-# Define the log hazard function
+# define the log hazard function
 def log_hazard_func_linear_ti(t, x1, x2, x3):
-    """
-    Example log hazard function that depends on time, age, bmi, and treatment.
-    This is a placeholder; replace with the actual log hazard function.
-    """
-    return np.log(0.03 * np.exp((0.8 * x1) + (0.5 * x2) + (0.9 * x3) + (-0.6 * x3 * x1)))
+    return np.log(0.03 * np.exp((0.4 * x1) - (0.8 * x2) - (0.6 * x3)))
 
-# Explain the first row of x_new for every third time point
-# Wrap the hazard function
+# explain
+# wrap the hazard function
 def log_hazard_wrap_linear_ti(X, t):
     return survshapiq_func.hazard_matrix(X, log_hazard_func_linear_ti, t)
+
 # exact
 explanation_linear_ti_loghaz = survshapiq_func.survshapiq_ground_truth(data_x_linear_ti, 
                                                             x_new_linear_ti, 
@@ -113,6 +111,7 @@ explanation_linear_ti_loghaz = survshapiq_func.survshapiq_ground_truth(data_x_li
                                                             times=model_gbsa_linear_ti.unique_times_[::5], 
                                                             budget=2**8, 
                                                             max_order=2, 
+                                                            index= "k-SII",
                                                             exact=True,
                                                             feature_names = data_x_linear_ti_df.columns)
 
@@ -120,9 +119,10 @@ survshapiq_func.plot_interact(explanations_all = explanation_linear_ti_loghaz,
                               model = None,
                               times=model_gbsa_linear_ti.unique_times_[::5], 
                               x_new = x_new_linear_ti, 
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_gt_linear_ti_loghaz.pdf",
+                              save_path = f"{path_plots}/1_linear_ti/plot_gt_linear_ti_loghaz.pdf",
                               data_x = data_x_linear_ti,
                               survival_fn = log_hazard_wrap_linear_ti,
+                              compare_plots="Diff",
                               idx_plot=idx, 
                               ylabel="Attribution $\log(h(t|x))$",
                               label_fontsize=16,
@@ -133,17 +133,19 @@ survshapiq_func.plot_interact(explanations_all = explanation_linear_ti_loghaz,
                               smooth_poly=1)  
 
 ######### GROUND TRUTH SURVIVAL
-# Explain the first row of x_new for every third time point
-# Wrap the survival function
+# explain
+# wrap the survival function
 def surv_from_hazard_linear_ti_wrap (X, t):
     return survshapiq_func.survival_from_hazard(X, hazard_func_linear_ti, t)
-# k-SII
+
+# exact
 explanation_linear_ti_surv = survshapiq_func.survshapiq_ground_truth(data_x_linear_ti, 
                                                             x_new_linear_ti, 
                                                             surv_from_hazard_linear_ti_wrap, 
                                                             times=model_gbsa_linear_ti.unique_times_[::5], 
                                                             budget=2**8, 
                                                             max_order=2, 
+                                                            index= "k-SII",
                                                             exact=True,
                                                             feature_names = data_x_linear_ti_df.columns)
 
@@ -151,61 +153,64 @@ survshapiq_func.plot_interact(explanations_all = explanation_linear_ti_surv,
                               model = None,
                               times=model_gbsa_linear_ti.unique_times_[::5], 
                               x_new = x_new_linear_ti, 
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_gt_linear_ti_surv.pdf",
+                              save_path = f"{path_plots}/1_linear_ti/plot_gt_linear_ti_surv.pdf",
                               data_x = data_x_linear_ti,
                               survival_fn = surv_from_hazard_linear_ti_wrap,
+                              compare_plots="Diff",
                               idx_plot=idx, 
                               ylabel="Attribution $S(t|x)$",
                               label_fontsize=16,
                               tick_fontsize=14,
                               figsize=(10,6),
                               smooth=True,
-                              smooth_window=100,
+                              smooth_window=50,
                               smooth_poly=1) 
 
 ########### MODEL SURVIVAL
-# gbsg 
-explanation_gbsa_linear_ti = survshapiq_func.survshapiq(model_gbsa_linear_ti, 
+# gbsa
+explanation_linear_ti_gbsa = survshapiq_func.survshapiq(model_gbsa_linear_ti, 
                                                     X_train_linear_ti, 
                                                     x_new_linear_ti,  
                                                     time_stride=5,
                                                     budget=2**8, 
                                                     max_order=2, 
+                                                    index= "k-SII",
                                                     exact=True, 
                                                     feature_names = data_x_linear_ti_df.columns)
 
-survshapiq_func.plot_interact(explanations_all = explanation_gbsa_linear_ti, 
+survshapiq_func.plot_interact(explanations_all = explanation_linear_ti_gbsa, 
                               model = model_gbsa_linear_ti,
                               x_new = x_new_linear_ti, 
                               times=model_gbsa_linear_ti.unique_times_[::5],
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_gbsa_linear_ti_surv.pdf",
-                              compare_plots = True, 
+                              save_path = f"{path_plots}/1_linear_ti/plot_gbsa_linear_ti_surv.pdf",
                               data_x = data_x_linear_ti,
+                              compare_plots="Diff",
                               idx_plot=idx,
                               ylabel="Attribution $\hat{S}(t|x)$",
                               label_fontsize=16,
                               tick_fontsize=14,
                               figsize=(10,6),
                               smooth=True,
-                              smooth_window=100,
+                              smooth_window=50,
                               smooth_poly=1) 
 
 # coxph
-explanation_cox_linear_ti = survshapiq_func.survshapiq(model_cox_linear_ti, 
+explanation_linear_ti_cox = survshapiq_func.survshapiq(model_cox_linear_ti, 
                                                     X_train_linear_ti, 
                                                     x_new_linear_ti, 
                                                     time_stride=5, 
                                                     budget=2**8, 
                                                     max_order=2, 
+                                                    index= "k-SII",
                                                     exact=True, 
                                                     feature_names = data_x_linear_ti_df.columns)
 
-survshapiq_func.plot_interact(explanations_all = explanation_cox_linear_ti, 
+survshapiq_func.plot_interact(explanations_all = explanation_linear_ti_cox, 
                               model = model_cox_linear_ti,
                               x_new = x_new_linear_ti, 
                               times=model_cox_linear_ti.unique_times_[::10],
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_cox_linear_ti_surv.pdf",
-                              compare_plots = True, 
+                              save_path = f"{path_plots}/1_linear_ti/plot_cox_linear_ti_surv.pdf",
+                              compare_plots = "Diff", 
                               data_x = data_x_linear_ti,
                               idx_plot=idx,
                               ylabel="Attribution $\hat{S}(t|x)$",
@@ -213,19 +218,20 @@ survshapiq_func.plot_interact(explanations_all = explanation_cox_linear_ti,
                               tick_fontsize=14,
                               figsize=(10,6),
                               smooth=True,
-                              smooth_window=100,
+                              smooth_window=50,
                               smooth_poly=1) 
 
 
+#---------------------------
+# 2) Linear G(t|x), TD MAIN (no interactions)
+#---------------------------
 
-################ LINEAR MAIN EFFECTS AND LINEAR INTERACTIONS
-###### TIME-DEPENDENCE IN MAIN EFFECTS
-# Load simulated data DataFrame
-simdata_linear_tdmain = pd.read_csv("/home/slangbei/survshapiq/survshapiq/simulation/simdata_linear_td_main.csv")
+# load simulated data DataFrame
+simdata_linear_tdmain = pd.read_csv(f"{path_data}/2_simdata_linear_tdmain.csv")
 print(simdata_linear_tdmain.head())
 simdata_linear_tdmain
 
-# Convert eventtime and status columns to a structured array
+# convert eventtime and status columns to a structured array
 data_y_linear_tdmain, data_x_linear_tdmain_df = survshapiq_func.prepare_survival_data(simdata_linear_tdmain)
 print(data_y_linear_tdmain)
 print(data_x_linear_tdmain_df.head())
@@ -237,40 +243,35 @@ X_train_linear_tdmain, X_test_linear_tdmain, y_train_linear_tdmain, y_test_linea
     stratify=None    
 )
 
-# Fit GradientBoostingSurvivalAnalysis
+# fit GradientBoostingSurvivalAnalysis
 model_gbsa_linear_tdmain = GradientBoostingSurvivalAnalysis()
 model_gbsa_linear_tdmain.fit(X_train_linear_tdmain, y_train_linear_tdmain)
 print(f'C-index (train): {model_gbsa_linear_tdmain.score(X_test_linear_tdmain, y_test_linear_tdmain).item():0.3f}')
-ibs_gbsa_linear_tdmain = survshapiq_func.compute_integrated_brier(y_test_linear_tdmain, X_test_linear_tdmain, model_gbsa_linear_tdmain, min_time = 0.01, max_time = 69)
+ibs_gbsa_linear_tdmain = survshapiq_func.compute_integrated_brier(y_test_linear_tdmain, X_test_linear_tdmain, model_gbsa_linear_tdmain, min_time = 0.09, max_time = 69)
 print(f'Integrated Brier Score (train): {ibs_gbsa_linear_tdmain:0.3f}')
 
-# Fit CoxPH
+# fit CoxPH
 model_cox_linear_tdmain = CoxPHSurvivalAnalysis()
 model_cox_linear_tdmain.fit(X_train_linear_tdmain, y_train_linear_tdmain)
 print(f'C-index (train): {model_cox_linear_tdmain.score(X_test_linear_tdmain, y_test_linear_tdmain).item():0.3f}')
-ibs_cox_linear_tdmain = survshapiq_func.compute_integrated_brier(y_test_linear_tdmain, X_test_linear_tdmain, model_cox_linear_tdmain, min_time = 0.01, max_time = 69)
+ibs_cox_linear_tdmain = survshapiq_func.compute_integrated_brier(y_test_linear_tdmain, X_test_linear_tdmain, model_cox_linear_tdmain, min_time = 0.09, max_time = 69)
 print(f'Integrated Brier Score (train): {ibs_cox_linear_tdmain:0.3f}')
 
-# Create data point for explanation
-idx =  10
+# create data point for explanation
+idx =  7
 x_new_linear_tdmain = data_x_linear_tdmain[[idx]]
-#x_new_ti = data_x_ti[1:9]
 print(x_new_linear_tdmain)
 
 ###### GROUND TRUTH HAZARD
-# Define the hazard function
+# define the hazard function
 def hazard_func_linear_tdmain(t, x1, x2, x3):
-    """
-    Example hazard function that depends on time, age, bmi, and treatment.
-    This is a placeholder; replace with the actual hazard function.
-    """
-    return 0.03 * np.exp((0.8 * x1) + (-1.2 * x1 * np.log(t+1)) + (0.5 * x2) + (0.9 * x3) + (-0.6 * x3 * x1))
+    return 0.03 * np.exp((0.4 * x1) * np.log(t+ 1) - (0.8 * x2) - (0.6 * x3))
 
-
-# Explain the first row of x_new for every third time point
-# Wrap the hazard function
+# explain
+# wrap the hazard function
 def hazard_wrap_linear_tdmain(X, t):
     return survshapiq_func.hazard_matrix(X, hazard_func_linear_tdmain, t)
+
 # exact
 explanation_linear_tdmain_haz = survshapiq_func.survshapiq_ground_truth(data_x_linear_tdmain, 
                                                             x_new_linear_tdmain, 
@@ -278,6 +279,7 @@ explanation_linear_tdmain_haz = survshapiq_func.survshapiq_ground_truth(data_x_l
                                                             times=model_gbsa_linear_tdmain.unique_times_[::5], 
                                                             budget=2**8, 
                                                             max_order=2, 
+                                                            index= "k-SII",
                                                             exact=True,
                                                             feature_names = data_x_linear_tdmain_df.columns)
 
@@ -285,10 +287,11 @@ survshapiq_func.plot_interact(explanations_all = explanation_linear_tdmain_haz,
                               model = None,
                               times=model_gbsa_linear_tdmain.unique_times_[::5], 
                               x_new = x_new_linear_tdmain, 
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_gt_linear_tdmain_haz.pdf", # plot_gt_td_haz_sm_5
+                              save_path = f"{path_plots}/2_linear_tdmain/plot_gt_linear_tdmain_haz.pdf",
                               data_x = data_x_linear_tdmain,
                               survival_fn = hazard_wrap_linear_tdmain,
                               ylabel="Attribution $h(t|x)$",
+                              compare_plots="Diff",
                               label_fontsize=16,
                               tick_fontsize=14,
                               figsize=(10,6),
@@ -298,18 +301,15 @@ survshapiq_func.plot_interact(explanations_all = explanation_linear_tdmain_haz,
                               smooth_poly=1) 
 
 ###### GROUND TRUTH LOG HAZARD
-# Define the log hazard function
+# define the log hazard function
 def log_hazard_func_linear_tdmain(t, x1, x2, x3):
-    """
-    Example log hazard function that depends on time, age, bmi, and treatment.
-    This is a placeholder; replace with the actual log hazard function.
-    """
-    return np.log(0.03 * np.exp((0.8 * x1) + (-1.2 * x1 * np.log(t+1)) + (0.5 * x2) + (0.9 * x3) + (-0.6 * x3 * x1)))
+    return np.log(0.03 * np.exp((0.4 * x1) * np.log(t+1) - (0.8 * x2) - (0.6 * x3)))
 
-# Explain the first row of x_new for every third time point
-# Wrap the hazard function
+# explain
+# wrap the hazard function
 def log_hazard_wrap_linear_tdmain(X, t):
     return survshapiq_func.hazard_matrix(X, log_hazard_func_linear_tdmain, t)
+
 # exact
 explanation_linear_tdmain_loghaz = survshapiq_func.survshapiq_ground_truth(data_x_linear_tdmain, 
                                                             x_new_linear_tdmain, 
@@ -317,6 +317,7 @@ explanation_linear_tdmain_loghaz = survshapiq_func.survshapiq_ground_truth(data_
                                                             times=model_gbsa_linear_tdmain.unique_times_[::5], 
                                                             budget=2**8, 
                                                             max_order=2, 
+                                                            index= "k-SII",
                                                             exact=True,
                                                             feature_names = data_x_linear_tdmain_df.columns)
 
@@ -324,9 +325,10 @@ survshapiq_func.plot_interact(explanations_all = explanation_linear_tdmain_logha
                               model = None,
                               times=model_gbsa_linear_tdmain.unique_times_[::5], 
                               x_new = x_new_linear_tdmain, 
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_gt_linear_tdmain_loghaz.pdf", 
+                              save_path = f"{path_plots}/2_linear_tdmain/plot_gt_linear_tdmain_loghaz.pdf", 
                               data_x = data_x_linear_tdmain,
                               survival_fn = log_hazard_wrap_linear_tdmain,
+                              compare_plots="Diff",
                               ylabel="Attribution $\log(h(t|x))$",
                               label_fontsize=16,
                               tick_fontsize=14,
@@ -338,10 +340,11 @@ survshapiq_func.plot_interact(explanations_all = explanation_linear_tdmain_logha
 
 
 ###### GROUND TRUTH SURVIVAL
-# Explain the first row of x_new for every third time point
-# Wrap the survival function
+# explain
+# wrap the survival function
 def surv_from_hazard_linear_tdmain_wrap(X, t):
     return survshapiq_func.survival_from_hazard(X, hazard_func_linear_tdmain, t)
+
 # exact
 explanation_linear_tdmain_surv = survshapiq_func.survshapiq_ground_truth(data_x_linear_tdmain, 
                                                             x_new_linear_tdmain, 
@@ -349,22 +352,24 @@ explanation_linear_tdmain_surv = survshapiq_func.survshapiq_ground_truth(data_x_
                                                             times=model_gbsa_linear_tdmain.unique_times_[::5], 
                                                             budget=2**8, 
                                                             max_order=2, 
+                                                            index= "k-SII",
                                                             exact=True,
                                                             feature_names = data_x_linear_tdmain_df.columns)
 survshapiq_func.plot_interact(explanations_all = explanation_linear_tdmain_surv, 
                               model = None,
                               times=model_gbsa_linear_tdmain.unique_times_[::5], 
                               x_new = x_new_linear_tdmain, 
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_gt_linear_tdmain_surv.pdf",
+                              save_path = f"{path_plots}/2_linear_tdmain/plot_gt_linear_tdmain_surv.pdf",
                               data_x = data_x_linear_tdmain,
                               survival_fn = surv_from_hazard_linear_tdmain_wrap,
+                              compare_plots="Diff",
                               ylabel="Attribution $S(t|x)$",
                               label_fontsize=16,
                               tick_fontsize=14,
                               figsize=(10,6),
                               idx_plot=idx, 
                               smooth=True,
-                              smooth_window=100,
+                              smooth_window=50,
                               smooth_poly=1) 
 
 
@@ -376,6 +381,7 @@ explanation_linear_tdmain_gbsa = survshapiq_func.survshapiq(model_gbsa_linear_td
                                                     time_stride=5, 
                                                     budget=2**8, 
                                                     max_order=2, 
+                                                    index= "k-SII",
                                                     exact=True, 
                                                     feature_names = data_x_linear_tdmain_df.columns)
 
@@ -383,8 +389,8 @@ survshapiq_func.plot_interact(explanations_all = explanation_linear_tdmain_gbsa,
                               model = model_gbsa_linear_tdmain,
                               x_new = x_new_linear_tdmain, 
                               times = model_gbsa_linear_tdmain.unique_times_[::5],
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_gbsa_linear_tdmain_surv.pdf",
-                              compare_plots = True, 
+                              save_path = f"{path_plots}/2_linear_tdmain/plot_gbsa_linear_tdmain_surv.pdf",
+                              compare_plots = "Diff", 
                               data_x = data_x_linear_tdmain,
                               ylabel="Attribution $\hat{S}(t|x)$",
                               label_fontsize=16,
@@ -392,7 +398,7 @@ survshapiq_func.plot_interact(explanations_all = explanation_linear_tdmain_gbsa,
                               figsize=(10,6),
                               idx_plot=idx,
                               smooth=True,
-                              smooth_window=100,
+                              smooth_window=50,
                               smooth_poly=1) 
 
 # coxph
@@ -402,6 +408,7 @@ explanation_linear_tdmain_cox = survshapiq_func.survshapiq(model_cox_linear_tdma
                                                     time_stride=5, 
                                                     budget=2**8, 
                                                     max_order=2, 
+                                                    index= "k-SII",
                                                     exact=True, 
                                                     feature_names = data_x_linear_tdmain_df.columns)
 
@@ -409,8 +416,8 @@ survshapiq_func.plot_interact(explanations_all = explanation_linear_tdmain_cox,
                               model = model_cox_linear_tdmain,
                               times=model_cox_linear_tdmain.unique_times_[::5],
                               x_new = x_new_linear_tdmain, 
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_cox_linear_tdmain_surv.pdf",
-                              compare_plots = True, 
+                              save_path = f"{path_plots}/2_linear_tdmain/plot_cox_linear_tdmain_surv.pdf",
+                              compare_plots = "Diff", 
                               data_x = data_x_linear_tdmain,
                               ylabel="Attribution $\hat{S}(t|x)$",
                               label_fontsize=16,
@@ -418,18 +425,437 @@ survshapiq_func.plot_interact(explanations_all = explanation_linear_tdmain_cox,
                               figsize=(10,6),
                               idx_plot=idx,
                               smooth=True,
+                              smooth_window=50,
+                              smooth_poly=1) 
+
+
+#---------------------------
+# 3) Linear G(t|x), TI (interactions)
+#---------------------------
+
+# load simulated data DataFrame
+simdata_linear_ti_inter = pd.read_csv(f"{path_data}/3_simdata_linear_ti_inter.csv")
+print(simdata_linear_ti_inter.head())
+simdata_linear_ti_inter
+
+# Convert eventtime and status columns to a structured array
+data_y_linear_ti_inter, data_x_linear_ti_inter_df = survshapiq_func.prepare_survival_data(simdata_linear_ti_inter)
+print(data_y_linear_ti_inter)
+print(data_x_linear_ti_inter_df.head())
+data_x_linear_ti_inter = data_x_linear_ti_inter_df.values
+X_train_linear_ti_inter, X_test_linear_ti_inter, y_train_linear_ti_inter, y_test_linear_ti_inter = train_test_split(
+    data_x_linear_ti_inter, data_y_linear_ti_inter, 
+    test_size=0.2,   
+    random_state=42, 
+    stratify=None    
+)
+
+# fit GradientBoostingSurvivalAnalysis
+model_gbsa_linear_ti_inter = GradientBoostingSurvivalAnalysis()
+model_gbsa_linear_ti_inter.fit(X_train_linear_ti_inter, y_train_linear_ti_inter)
+print(f'C-index (train): {model_gbsa_linear_ti_inter.score(X_test_linear_ti_inter, y_test_linear_ti_inter).item():0.3f}')
+ibs_gbsa_linear_ti_inter = survshapiq_func.compute_integrated_brier(y_test_linear_ti_inter, X_test_linear_ti_inter, model_gbsa_linear_ti_inter, min_time = 0.06, max_time = 69)
+print(f'Integrated Brier Score (train): {ibs_gbsa_linear_ti_inter:0.3f}')
+
+# fit CoxPH
+model_cox_linear_ti_inter = CoxPHSurvivalAnalysis()
+model_cox_linear_ti_inter.fit(X_train_linear_ti_inter, y_train_linear_ti_inter)
+print(f'C-index (train): {model_cox_linear_ti_inter.score(X_test_linear_ti_inter, y_test_linear_ti_inter).item():0.3f}')
+ibs_cox_linear_ti_inter = survshapiq_func.compute_integrated_brier(y_test_linear_ti_inter, X_test_linear_ti_inter, model_cox_linear_ti_inter, min_time = 0.06, max_time = 69)
+print(f'Integrated Brier Score (train): {ibs_cox_linear_ti_inter:0.3f}')
+
+
+# create data point for explanation
+idx =  7
+x_new_linear_ti_inter = data_x_linear_ti_inter[[idx]]
+print(x_new_linear_ti_inter)
+
+###### GROUND TRUTH HAZARD
+# define the hazard function
+def hazard_func_linear_ti_inter(t, x1, x2, x3):
+    return (0.03 * np.exp((0.4 * x1) - (0.8 * x2) - (0.6 * x3) - (0.9 * x1 * x3)))
+
+# explain
+# wrap the hazard function
+def hazard_wrap_linear_ti_inter(X, t):
+    return survshapiq_func.hazard_matrix(X, hazard_func_linear_ti_inter, t)
+    
+# exact
+explanation_linear_ti_inter_haz = survshapiq_func.survshapiq_ground_truth(data_x_linear_ti_inter, 
+                                                            x_new_linear_ti_inter, 
+                                                            hazard_wrap_linear_ti_inter, 
+                                                            times=model_gbsa_linear_ti_inter.unique_times_[::5], 
+                                                            budget=2**8, 
+                                                            max_order=2, 
+                                                            index= "k-SII",
+                                                            exact=True,
+                                                            feature_names = data_x_linear_ti_inter_df.columns)
+
+survshapiq_func.plot_interact(explanations_all = explanation_linear_ti_inter_haz, 
+                              model = None,
+                              times=model_gbsa_linear_ti_inter.unique_times_[::5], 
+                              x_new = x_new_linear_ti_inter, 
+                              save_path = f"{path_plots}/3_linear_ti_inter/plot_gt_linear_ti_inter_haz.pdf", 
+                              data_x = data_x_linear_ti_inter,
+                              survival_fn = hazard_wrap_linear_ti_inter,
+                              ylabel="Attribution $h(t|x)$",
+                              compare_plots="Diff",
+                              label_fontsize=16,
+                              tick_fontsize=14,
+                              figsize=(10,6),
+                              idx_plot=idx, 
+                              smooth=True,
+                              smooth_window=100,
+                              smooth_poly=1) 
+
+###### GROUND TRUTH LOG HAZARD
+# define the log hazard function
+def log_hazard_func_linear_ti_inter(t, x1, x2, x3):
+    return np.log((0.03 * np.exp((0.4 * x1) - (0.8 * x2) - (0.6 * x3) - (0.9 * x1 * x3))))
+
+# explain
+# wrap the hazard function
+def log_hazard_wrap_linear_ti_inter(X, t):
+    return survshapiq_func.hazard_matrix(X, log_hazard_func_linear_ti_inter, t)
+
+# exact
+explanation_linear_ti_inter_loghaz = survshapiq_func.survshapiq_ground_truth(data_x_linear_ti_inter, 
+                                                            x_new_linear_ti_inter, 
+                                                            log_hazard_wrap_linear_ti_inter, 
+                                                            times=model_gbsa_linear_ti_inter.unique_times_[::5], 
+                                                            budget=2**8, 
+                                                            max_order=2, 
+                                                            index= "k-SII",
+                                                            exact=True,
+                                                            feature_names = data_x_linear_ti_inter_df.columns)
+
+survshapiq_func.plot_interact(explanations_all = explanation_linear_ti_inter_loghaz, 
+                              model = None,
+                              times=model_gbsa_linear_ti_inter.unique_times_[::5], 
+                              x_new = x_new_linear_ti_inter, 
+                              save_path = f"{path_plots}/3_linear_ti_inter/plot_gt_linear_ti_inter_loghaz.pdf", #gt_td_log_haz_sm_5
+                              data_x = data_x_linear_ti_inter,
+                              survival_fn = log_hazard_wrap_linear_ti_inter,
+                              compare_plots="Diff",
+                              ylabel="Attribution $\log(h(t|x))$",
+                              label_fontsize=16,
+                              tick_fontsize=14,
+                              figsize=(10,6),
+                              idx_plot=idx, 
+                              smooth=True,
                               smooth_window=100,
                               smooth_poly=1) 
 
 
-################ LINEAR MAIN EFFECTS AND LINEAR INTERACTIONS
-###### TIME-DEPENDENCE IN INTERACTION EFFECTS
-# Load simulated data DataFrame
-simdata_linear_tdinter = pd.read_csv("/home/slangbei/survshapiq/survshapiq/simulation/simdata_linear_td_inter.csv")
+###### GROUND TRUTH SURVIVAL
+# explain
+# wrap the survival function
+def surv_from_hazard_linear_ti_inter_wrap(X, t):
+    return survshapiq_func.survival_from_hazard(X, hazard_func_linear_ti_inter, t)
+
+# exact
+explanation_linear_ti_inter_surv = survshapiq_func.survshapiq_ground_truth(data_x_linear_ti_inter, 
+                                                            x_new_linear_ti_inter, 
+                                                            surv_from_hazard_linear_ti_inter_wrap, 
+                                                            times=model_gbsa_linear_ti_inter.unique_times_[::5], 
+                                                            budget=2**8, 
+                                                            max_order=2, 
+                                                            index= "k-SII",
+                                                            exact=True,
+                                                            feature_names = data_x_linear_ti_inter_df.columns)
+
+survshapiq_func.plot_interact(explanations_all = explanation_linear_ti_inter_surv, 
+                              model = None,
+                              times=model_gbsa_linear_ti_inter.unique_times_[::5], 
+                              x_new = x_new_linear_ti_inter, 
+                              save_path = f"{path_plots}/3_linear_ti_inter/plot_gt_linear_ti_inter_surv.pdf",
+                              data_x = data_x_linear_ti_inter,
+                              survival_fn = surv_from_hazard_linear_ti_inter_wrap,
+                              compare_plots="Diff",
+                              ylabel="Attribution $S(t|x)$",
+                              label_fontsize=16,
+                              tick_fontsize=14,
+                              figsize=(10,6),
+                              idx_plot=idx, 
+                              smooth=True,
+                              smooth_window=30,
+                              smooth_poly=1) 
+
+
+###### MODEL SURVIVAL
+# gbsa
+explanation_linear_ti_inter_gbsa = survshapiq_func.survshapiq(model_gbsa_linear_ti_inter, 
+                                                    X_train_linear_ti_inter, 
+                                                    x_new_linear_ti_inter, 
+                                                    time_stride=5, 
+                                                    budget=2**8, 
+                                                    max_order=2, 
+                                                    index= "k-SII",
+                                                    exact=True, 
+                                                    feature_names = data_x_linear_ti_inter_df.columns)
+
+survshapiq_func.plot_interact(explanations_all = explanation_linear_ti_inter_gbsa, 
+                              model = model_gbsa_linear_ti_inter,
+                              x_new = x_new_linear_ti_inter, 
+                              times = model_gbsa_linear_ti_inter.unique_times_[::5],
+                              save_path = f"{path_plots}/3_linear_ti_inter/plot_gbsa_linear_ti_inter_surv.pdf",
+                              compare_plots = "Diff", 
+                              data_x = data_x_linear_ti_inter,
+                              ylabel="Attribution $\hat{S}(t|x)$",
+                              label_fontsize=16,
+                              tick_fontsize=14,
+                              figsize=(10,6),
+                              idx_plot=idx,
+                              smooth=True,
+                              smooth_window=50,
+                              smooth_poly=1) 
+
+# coxph
+explanation_linear_ti_inter_cox = survshapiq_func.survshapiq(model_cox_linear_ti_inter, 
+                                                    X_train_linear_ti_inter, 
+                                                    x_new_linear_ti_inter, 
+                                                    time_stride=5, 
+                                                    budget=2**8, 
+                                                    max_order=2, 
+                                                    index= "k-SII",
+                                                    exact=True, 
+                                                    feature_names = data_x_linear_ti_inter_df.columns)
+
+survshapiq_func.plot_interact(explanations_all = explanation_linear_ti_inter_cox, 
+                              model = model_cox_linear_ti_inter,
+                              x_new = x_new_linear_ti_inter, 
+                              times = model_cox_linear_ti_inter.unique_times_[::5],
+                              save_path = f"{path_plots}/3_linear_ti_inter/plot_cox_linear_ti_inter_surv.pdf",
+                              compare_plots = "Diff", 
+                              data_x = data_x_linear_ti_inter,
+                              ylabel="Attribution $\hat{S}(t|x)$",
+                              label_fontsize=16,
+                              tick_fontsize=14,
+                              figsize=(10,6),
+                              idx_plot=idx,
+                              smooth=True,
+                              smooth_window=50,
+                              smooth_poly=1) 
+
+
+#---------------------------
+# 4) Linear G(t|x), TD MAIN (interactions)
+#---------------------------
+
+# load simulated data DataFrame
+simdata_linear_tdmain_inter = pd.read_csv(f"{path_data}/4_simdata_linear_tdmain_inter.csv")
+print(simdata_linear_tdmain_inter.head())
+simdata_linear_tdmain_inter
+
+# Convert eventtime and status columns to a structured array
+data_y_linear_tdmain_inter, data_x_linear_tdmain_inter_df = survshapiq_func.prepare_survival_data(simdata_linear_tdmain_inter)
+print(data_y_linear_tdmain_inter)
+print(data_x_linear_tdmain_inter_df.head())
+data_x_linear_tdmain_inter = data_x_linear_tdmain_inter_df.values
+X_train_linear_tdmain_inter, X_test_linear_tdmain_inter, y_train_linear_tdmain_inter, y_test_linear_tdmain_inter = train_test_split(
+    data_x_linear_tdmain_inter, data_y_linear_tdmain_inter, 
+    test_size=0.2,   
+    random_state=42, 
+    stratify=None    
+)
+
+# fit GradientBoostingSurvivalAnalysis
+model_gbsa_linear_tdmain_inter = GradientBoostingSurvivalAnalysis()
+model_gbsa_linear_tdmain_inter.fit(X_train_linear_tdmain_inter, y_train_linear_tdmain_inter)
+print(f'C-index (train): {model_gbsa_linear_tdmain_inter.score(X_test_linear_tdmain_inter, y_test_linear_tdmain_inter).item():0.3f}')
+ibs_gbsa_linear_tdmain_inter = survshapiq_func.compute_integrated_brier(y_test_linear_tdmain_inter, X_test_linear_tdmain_inter, model_gbsa_linear_tdmain_inter, min_time = 0.13, max_time = 69)
+print(f'Integrated Brier Score (train): {ibs_gbsa_linear_tdmain_inter:0.3f}')
+
+# fit CoxPH
+model_cox_linear_tdmain_inter = CoxPHSurvivalAnalysis()
+model_cox_linear_tdmain_inter.fit(X_train_linear_tdmain_inter, y_train_linear_tdmain_inter)
+print(f'C-index (train): {model_cox_linear_tdmain_inter.score(X_test_linear_tdmain_inter, y_test_linear_tdmain_inter).item():0.3f}')
+ibs_cox_linear_tdmain_inter = survshapiq_func.compute_integrated_brier(y_test_linear_tdmain_inter, X_test_linear_tdmain_inter, model_cox_linear_tdmain_inter, min_time = 0.13, max_time = 69)
+print(f'Integrated Brier Score (train): {ibs_cox_linear_tdmain_inter:0.3f}')
+
+
+# create data point for explanation
+idx =  7
+x_new_linear_tdmain_inter = data_x_linear_tdmain_inter[[idx]]
+print(x_new_linear_tdmain_inter)
+
+###### GROUND TRUTH HAZARD
+# define the hazard function
+def hazard_func_linear_tdmain_inter(t, x1, x2, x3):
+    return (0.03 * np.exp((0.4 * x1) * np.log(t + 1) - (0.8 * x2) - (0.6 * x3) - (0.9 * x1 * x3)))
+
+# explain
+# wrap the hazard function
+def hazard_wrap_linear_tdmain_inter(X, t):
+    return survshapiq_func.hazard_matrix(X, hazard_func_linear_tdmain_inter, t)
+
+# exact
+explanation_linear_tdmain_inter_haz = survshapiq_func.survshapiq_ground_truth(data_x_linear_tdmain_inter, 
+                                                            x_new_linear_tdmain_inter, 
+                                                            hazard_wrap_linear_tdmain_inter, 
+                                                            times=model_gbsa_linear_tdmain_inter.unique_times_[::5], 
+                                                            budget=2**8, 
+                                                            max_order=2, 
+                                                            index= "k-SII",
+                                                            exact=True,
+                                                            feature_names = data_x_linear_tdmain_inter_df.columns)
+
+survshapiq_func.plot_interact(explanations_all = explanation_linear_tdmain_inter_haz, 
+                              model = None,
+                              times=model_gbsa_linear_tdmain_inter.unique_times_[::5], 
+                              x_new = x_new_linear_tdmain_inter, 
+                              save_path = f"{path_plots}/4_linear_tdmain_inter/plot_gt_linear_tdmain_inter_haz.pdf", 
+                              data_x = data_x_linear_tdmain_inter,
+                              survival_fn = hazard_wrap_linear_tdmain_inter,
+                              ylabel="Attribution $h(t|x)$",
+                              compare_plots="Diff",
+                              label_fontsize=16,
+                              tick_fontsize=14,
+                              figsize=(10,6),
+                              idx_plot=idx, 
+                              smooth=True,
+                              smooth_window=40,
+                              smooth_poly=1) 
+
+###### GROUND TRUTH LOG HAZARD
+# define the log hazard function
+def log_hazard_func_linear_tdmain_inter(t, x1, x2, x3):
+    return np.log(0.03 * np.exp((0.4 * x1) * np.log(t + 1) - (0.8 * x2) - (0.6 * x3) - (0.9 * x1 * x3)))
+
+# explain
+# wrap the hazard function
+def log_hazard_wrap_linear_tdmain_inter(X, t):
+    return survshapiq_func.hazard_matrix(X, log_hazard_func_linear_tdmain_inter, t)
+
+# exact
+explanation_linear_tdmain_inter_loghaz = survshapiq_func.survshapiq_ground_truth(data_x_linear_tdmain_inter, 
+                                                            x_new_linear_tdmain_inter, 
+                                                            log_hazard_wrap_linear_tdmain_inter, 
+                                                            times=model_gbsa_linear_tdmain_inter.unique_times_[::5], 
+                                                            budget=2**8, 
+                                                            max_order=2, 
+                                                            index= "k-SII",
+                                                            exact=True,
+                                                            feature_names = data_x_linear_tdmain_inter_df.columns)
+
+survshapiq_func.plot_interact(explanations_all = explanation_linear_tdmain_inter_loghaz, 
+                              model = None,
+                              times=model_gbsa_linear_tdmain_inter.unique_times_[::5], 
+                              x_new = x_new_linear_tdmain_inter, 
+                              save_path = f"{path_plots}/4_linear_tdmain_inter/plot_gt_linear_tdmain_inter_loghaz.pdf", #gt_td_log_haz_sm_5
+                              data_x = data_x_linear_tdmain_inter,
+                              survival_fn = log_hazard_wrap_linear_tdmain_inter,
+                              compare_plots="Diff",
+                              ylabel="Attribution $\log(h(t|x))$",
+                              label_fontsize=16,
+                              tick_fontsize=14,
+                              figsize=(10,6),
+                              idx_plot=idx, 
+                              smooth=True,
+                              smooth_window=100,
+                              smooth_poly=1) 
+
+
+###### GROUND TRUTH SURVIVAL
+# explain
+# wrap the survival function
+def surv_from_hazard_linear_tdmain_inter_wrap(X, t):
+    return survshapiq_func.survival_from_hazard(X, hazard_func_linear_tdmain_inter, t)
+
+# exact
+explanation_linear_tdmain_inter_surv = survshapiq_func.survshapiq_ground_truth(data_x_linear_tdmain_inter, 
+                                                            x_new_linear_tdmain_inter, 
+                                                            surv_from_hazard_linear_tdmain_inter_wrap, 
+                                                            times=model_gbsa_linear_tdmain_inter.unique_times_[::5], 
+                                                            budget=2**8, 
+                                                            max_order=2, 
+                                                            index= "k-SII",
+                                                            exact=True,
+                                                            feature_names = data_x_linear_tdmain_inter_df.columns)
+
+survshapiq_func.plot_interact(explanations_all = explanation_linear_tdmain_inter_surv, 
+                              model = None,
+                              times=model_gbsa_linear_tdmain_inter.unique_times_[::5], 
+                              x_new = x_new_linear_tdmain_inter, 
+                              save_path = f"{path_plots}/4_linear_tdmain_inter/plot_gt_linear_tdmain_inter_surv.pdf",
+                              data_x = data_x_linear_tdmain_inter,
+                              survival_fn = surv_from_hazard_linear_tdmain_inter_wrap,
+                              compare_plots="Diff",
+                              ylabel="Attribution $S(t|x)$",
+                              label_fontsize=16,
+                              tick_fontsize=14,
+                              figsize=(10,6),
+                              idx_plot=idx, 
+                              smooth=True,
+                              smooth_window=30,
+                              smooth_poly=1) 
+
+
+###### MODEL SURVIVAL
+# gbsa
+explanation_linear_tdmain_inter_gbsa = survshapiq_func.survshapiq(model_gbsa_linear_tdmain_inter, 
+                                                    X_train_linear_tdmain_inter, 
+                                                    x_new_linear_tdmain_inter, 
+                                                    time_stride=5, 
+                                                    budget=2**8, 
+                                                    max_order=2, 
+                                                    index= "k-SII",
+                                                    exact=True, 
+                                                    feature_names = data_x_linear_tdmain_inter_df.columns)
+
+survshapiq_func.plot_interact(explanations_all = explanation_linear_tdmain_inter_gbsa, 
+                              model = model_gbsa_linear_tdmain_inter,
+                              x_new = x_new_linear_tdmain_inter, 
+                              times = model_gbsa_linear_tdmain_inter.unique_times_[::5],
+                              save_path = f"{path_plots}/4_linear_tdmain_inter/plot_gbsa_linear_tdmain_inter_surv.pdf",
+                              compare_plots = "Diff", 
+                              data_x = data_x_linear_tdmain_inter,
+                              ylabel="Attribution $\hat{S}(t|x)$",
+                              label_fontsize=16,
+                              tick_fontsize=14,
+                              figsize=(10,6),
+                              idx_plot=idx,
+                              smooth=True,
+                              smooth_window=50,
+                              smooth_poly=1) 
+
+# coxph
+explanation_linear_tdmain_inter_cox = survshapiq_func.survshapiq(model_cox_linear_tdmain_inter, 
+                                                    X_train_linear_tdmain_inter, 
+                                                    x_new_linear_tdmain_inter, 
+                                                    time_stride=5, 
+                                                    budget=2**8, 
+                                                    max_order=2, 
+                                                    index= "k-SII",
+                                                    exact=True, 
+                                                    feature_names = data_x_linear_tdmain_inter_df.columns)
+
+survshapiq_func.plot_interact(explanations_all = explanation_linear_tdmain_inter_cox, 
+                              model = model_cox_linear_tdmain_inter,
+                              x_new = x_new_linear_tdmain_inter, 
+                              times = model_cox_linear_tdmain_inter.unique_times_[::5],
+                              save_path = f"{path_plots}/4_linear_tdmain_inter/plot_cox_linear_tdmain_inter_surv.pdf",
+                              compare_plots = "Diff", 
+                              data_x = data_x_linear_tdmain_inter,
+                              ylabel="Attribution $\hat{S}(t|x)$",
+                              label_fontsize=16,
+                              tick_fontsize=14,
+                              figsize=(10,6),
+                              idx_plot=idx,
+                              smooth=True,
+                              smooth_window=50,
+                              smooth_poly=1) 
+
+#---------------------------
+# 5) Linear G(t|x), TD Inter (interactions)
+#---------------------------
+
+# load simulated data DataFrame
+simdata_linear_tdinter = pd.read_csv(f"{path_data}/5_simdata_linear_tdinter.csv")
 print(simdata_linear_tdinter.head())
 simdata_linear_tdinter
 
-# Convert eventtime and status columns to a structured array
+# convert eventtime and status columns to a structured array
 data_y_linear_tdinter, data_x_linear_tdinter_df = survshapiq_func.prepare_survival_data(simdata_linear_tdinter)
 print(data_y_linear_tdinter)
 print(data_x_linear_tdinter_df.head())
@@ -441,42 +867,36 @@ X_train_linear_tdinter, X_test_linear_tdinter, y_train_linear_tdinter, y_test_li
     stratify=None    
 )
 
-# Fit GradientBoostingSurvivalAnalysis
+# fit GradientBoostingSurvivalAnalysis
 model_gbsa_linear_tdinter = GradientBoostingSurvivalAnalysis()
-model_gbsa_linear_tdinter.fit(X_train_linear_tdmain, y_train_linear_tdinter)
-print(f'C-index (train): {model_gbsa_linear_tdinter.score(X_test_linear_tdmain, y_test_linear_tdinter).item():0.3f}')
-ibs_gbsa_linear_tdinter = survshapiq_func.compute_integrated_brier(y_test_linear_tdinter, X_test_linear_tdmain, model_gbsa_linear_tdinter, min_time = 0.01, max_time = 69)
+model_gbsa_linear_tdinter.fit(X_train_linear_tdinter, y_train_linear_tdinter)
+print(f'C-index (train): {model_gbsa_linear_tdinter.score(X_test_linear_tdinter, y_test_linear_tdinter).item():0.3f}')
+ibs_gbsa_linear_tdinter = survshapiq_func.compute_integrated_brier(y_test_linear_tdinter, X_test_linear_tdinter, model_gbsa_linear_tdinter, min_time = 0.08, max_time = 69)
 print(f'Integrated Brier Score (train): {ibs_gbsa_linear_tdinter:0.3f}')
 
-# Fit CoxPH
+# fit CoxPH
 model_cox_linear_tdinter = CoxPHSurvivalAnalysis()
-model_cox_linear_tdinter.fit(X_train_linear_tdmain, y_train_linear_tdinter)
-print(f'C-index (train): {model_cox_linear_tdinter.score(X_test_linear_tdmain, y_test_linear_tdinter).item():0.3f}')
-ibs_cox_linear_tdinter = survshapiq_func.compute_integrated_brier(y_test_linear_tdinter, X_test_linear_tdmain, model_cox_linear_tdinter, min_time = 0.01, max_time = 69)
+model_cox_linear_tdinter.fit(X_train_linear_tdinter, y_train_linear_tdinter)
+print(f'C-index (train): {model_cox_linear_tdinter.score(X_test_linear_tdinter, y_test_linear_tdinter).item():0.3f}')
+ibs_cox_linear_tdinter = survshapiq_func.compute_integrated_brier(y_test_linear_tdinter, X_test_linear_tdinter, model_cox_linear_tdinter, min_time = 0.08, max_time = 69)
 print(f'Integrated Brier Score (train): {ibs_cox_linear_tdinter:0.3f}')
 
 
-# Create data point for explanation
-idx =  10
+# create data point for explanation
+idx =  7
 x_new_linear_tdinter = data_x_linear_tdinter[[idx]]
-#x_new_ti = data_x_ti[1:9]
 print(x_new_linear_tdinter)
-x_new_linear_tdmain
 
 ###### GROUND TRUTH HAZARD
-# Define the hazard function
+# define the hazard function
 def hazard_func_linear_tdinter(t, x1, x2, x3):
-    """
-    Example hazard function that depends on time, age, bmi, and treatment.
-    This is a placeholder; replace with the actual hazard function.
-    """
-    return 0.03 * np.exp((0.8 * x1) + (0.5 * x2) + (0.9 * x3) + (-0.6 * x3 * x1) + (-0.4 * x1 * x3 * np.log(t+1)))
+    return (0.03 * np.exp((0.4 * x1) - (0.8 * x2) - (0.6 * x3) - (0.9 * x1 * x3) * np.log(t + 1)))
 
-
-# Explain the first row of x_new for every third time point
-# Wrap the hazard function
+# explain
+# wrap the hazard function
 def hazard_wrap_linear_tdinter(X, t):
     return survshapiq_func.hazard_matrix(X, hazard_func_linear_tdinter, t)
+
 # exact
 explanation_linear_tdinter_haz = survshapiq_func.survshapiq_ground_truth(data_x_linear_tdinter, 
                                                             x_new_linear_tdinter, 
@@ -484,6 +904,7 @@ explanation_linear_tdinter_haz = survshapiq_func.survshapiq_ground_truth(data_x_
                                                             times=model_gbsa_linear_tdinter.unique_times_[::5], 
                                                             budget=2**8, 
                                                             max_order=2, 
+                                                            index= "k-SII",
                                                             exact=True,
                                                             feature_names = data_x_linear_tdinter_df.columns)
 
@@ -491,31 +912,29 @@ survshapiq_func.plot_interact(explanations_all = explanation_linear_tdinter_haz,
                               model = None,
                               times=model_gbsa_linear_tdinter.unique_times_[::5], 
                               x_new = x_new_linear_tdinter, 
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_gt_linear_tdinter_haz.pdf", # plot_gt_td_haz_sm_5
+                              save_path = f"{path_plots}/5_linear_tdinter/plot_gt_linear_tdinter_haz.pdf", 
                               data_x = data_x_linear_tdinter,
                               survival_fn = hazard_wrap_linear_tdinter,
                               ylabel="Attribution $h(t|x)$",
+                              compare_plots="Diff",
                               label_fontsize=16,
                               tick_fontsize=14,
                               figsize=(10,6),
                               idx_plot=idx, 
                               smooth=True,
-                              smooth_window=100,
+                              smooth_window=10,
                               smooth_poly=1) 
 
 ###### GROUND TRUTH LOG HAZARD
-# Define the log hazard function
+# define the log hazard function
 def log_hazard_func_linear_tdinter(t, x1, x2, x3):
-    """
-    Example log hazard function that depends on time, age, bmi, and treatment.
-    This is a placeholder; replace with the actual log hazard function.
-    """
-    return np.log(0.03 * np.exp((0.8 * x1) + (0.5 * x2) + (0.9 * x3) + (-0.6 * x3 * x1) + (-0.4 * x1 * x3 * np.log(t+1))))
+    return np.log(0.03 * np.exp((0.4 * x1) - (0.8 * x2) - (0.6 * x3) - (0.9 * x1 * x3) * np.log(t + 1)))
 
-# Explain the first row of x_new for every third time point
-# Wrap the hazard function
+# explain
+# wrap the hazard function
 def log_hazard_wrap_linear_tdinter(X, t):
     return survshapiq_func.hazard_matrix(X, log_hazard_func_linear_tdinter, t)
+
 # exact
 explanation_linear_tdinter_loghaz = survshapiq_func.survshapiq_ground_truth(data_x_linear_tdinter, 
                                                             x_new_linear_tdinter, 
@@ -523,6 +942,7 @@ explanation_linear_tdinter_loghaz = survshapiq_func.survshapiq_ground_truth(data
                                                             times=model_gbsa_linear_tdinter.unique_times_[::5], 
                                                             budget=2**8, 
                                                             max_order=2, 
+                                                            index= "k-SII",
                                                             exact=True,
                                                             feature_names = data_x_linear_tdinter_df.columns)
 
@@ -530,9 +950,10 @@ survshapiq_func.plot_interact(explanations_all = explanation_linear_tdinter_logh
                               model = None,
                               times=model_gbsa_linear_tdinter.unique_times_[::5], 
                               x_new = x_new_linear_tdinter, 
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_gt_linear_tdinter_loghaz.pdf", #gt_td_log_haz_sm_5
+                              save_path = f"{path_plots}/5_linear_tdinter/plot_gt_linear_tdinter_loghaz.pdf",
                               data_x = data_x_linear_tdinter,
                               survival_fn = log_hazard_wrap_linear_tdinter,
+                              compare_plots="Diff",
                               ylabel="Attribution $\log(h(t|x))$",
                               label_fontsize=16,
                               tick_fontsize=14,
@@ -544,10 +965,11 @@ survshapiq_func.plot_interact(explanations_all = explanation_linear_tdinter_logh
 
 
 ###### GROUND TRUTH SURVIVAL
-# Explain the first row of x_new for every third time point
-# Wrap the survival function
+# explain
+# wrap the survival function
 def surv_from_hazard_linear_tdinter_wrap(X, t):
     return survshapiq_func.survival_from_hazard(X, hazard_func_linear_tdinter, t)
+
 # exact
 explanation_linear_tdinter_surv = survshapiq_func.survshapiq_ground_truth(data_x_linear_tdinter, 
                                                             x_new_linear_tdinter, 
@@ -555,22 +977,25 @@ explanation_linear_tdinter_surv = survshapiq_func.survshapiq_ground_truth(data_x
                                                             times=model_gbsa_linear_tdinter.unique_times_[::5], 
                                                             budget=2**8, 
                                                             max_order=2, 
+                                                            index= "k-SII",
                                                             exact=True,
                                                             feature_names = data_x_linear_tdinter_df.columns)
+
 survshapiq_func.plot_interact(explanations_all = explanation_linear_tdinter_surv, 
                               model = None,
                               times=model_gbsa_linear_tdinter.unique_times_[::5], 
                               x_new = x_new_linear_tdinter, 
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_gt_linear_tdinter_surv.pdf",
+                              save_path = f"{path_plots}/5_linear_tdinter/plot_gt_linear_tdinter_surv.pdf",
                               data_x = data_x_linear_tdinter,
                               survival_fn = surv_from_hazard_linear_tdinter_wrap,
+                              compare_plots="Diff",
                               ylabel="Attribution $S(t|x)$",
                               label_fontsize=16,
                               tick_fontsize=14,
                               figsize=(10,6),
                               idx_plot=idx, 
                               smooth=True,
-                              smooth_window=100,
+                              smooth_window=30,
                               smooth_poly=1) 
 
 
@@ -582,6 +1007,7 @@ explanation_linear_tdinter_gbsa = survshapiq_func.survshapiq(model_gbsa_linear_t
                                                     time_stride=5, 
                                                     budget=2**8, 
                                                     max_order=2, 
+                                                    index= "k-SII",
                                                     exact=True, 
                                                     feature_names = data_x_linear_tdinter_df.columns)
 
@@ -589,8 +1015,8 @@ survshapiq_func.plot_interact(explanations_all = explanation_linear_tdinter_gbsa
                               model = model_gbsa_linear_tdinter,
                               x_new = x_new_linear_tdinter, 
                               times = model_gbsa_linear_tdinter.unique_times_[::5],
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_gbsa_linear_tdinter_surv.pdf",
-                              compare_plots = True, 
+                              save_path = f"{path_plots}/5_linear_tdinter/plot_gbsa_linear_tdinter_surv.pdf",
+                              compare_plots = "Diff", 
                               data_x = data_x_linear_tdinter,
                               ylabel="Attribution $\hat{S}(t|x)$",
                               label_fontsize=16,
@@ -598,7 +1024,7 @@ survshapiq_func.plot_interact(explanations_all = explanation_linear_tdinter_gbsa
                               figsize=(10,6),
                               idx_plot=idx,
                               smooth=True,
-                              smooth_window=100,
+                              smooth_window=50,
                               smooth_poly=1) 
 
 # coxph
@@ -608,6 +1034,7 @@ explanation_linear_tdinter_cox = survshapiq_func.survshapiq(model_cox_linear_tdi
                                                     time_stride=5, 
                                                     budget=2**8, 
                                                     max_order=2, 
+                                                    index= "k-SII",
                                                     exact=True, 
                                                     feature_names = data_x_linear_tdinter_df.columns)
 
@@ -615,8 +1042,8 @@ survshapiq_func.plot_interact(explanations_all = explanation_linear_tdinter_cox,
                               model = model_cox_linear_tdinter,
                               x_new = x_new_linear_tdinter, 
                               times = model_cox_linear_tdinter.unique_times_[::5],
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_cox_linear_tdinter_surv.pdf",
-                              compare_plots = True, 
+                              save_path = f"{path_plots}/5_linear_tdinter/plot_cox_linear_tdinter_surv.pdf",
+                              compare_plots = "Diff", 
                               data_x = data_x_linear_tdinter,
                               ylabel="Attribution $\hat{S}(t|x)$",
                               label_fontsize=16,
@@ -624,219 +1051,20 @@ survshapiq_func.plot_interact(explanations_all = explanation_linear_tdinter_cox,
                               figsize=(10,6),
                               idx_plot=idx,
                               smooth=True,
-                              smooth_window=100,
+                              smooth_window=50,
                               smooth_poly=1) 
 
 
-################ ADDITIVE MAIN EFFECTS MODEL
-###### TIME-INDEPENDENCE 
-# Load simulated data DataFrame
-simdata_add_ti = pd.read_csv("/home/slangbei/survshapiq/survshapiq/simulation/simdata_add_ti.csv")
-print(simdata_add_ti.head())
-simdata_add_ti
+#---------------------------
+# 6) Generalized Additive G(t|x), TI (no interactions)
+#---------------------------
 
-# Convert eventtime and status columns to a structured array
-data_y_add_ti, data_x_add_ti_df = survshapiq_func.prepare_survival_data(simdata_add_ti)
-print(data_y_add_ti)
-print(data_x_add_ti_df.head())
-data_x_add_ti = data_x_add_ti_df.values
-X_train_add_ti, X_test_add_ti, y_train_add_ti, y_test_add_ti = train_test_split(
-    data_x_add_ti, data_y_add_ti, 
-    test_size=0.2,   
-    random_state=42, 
-    stratify=None    
-)
-
-# Fit GradientBoostingSurvivalAnalysis
-model_gbsa_add_ti = GradientBoostingSurvivalAnalysis()
-model_gbsa_add_ti.fit(X_train_add_ti, y_train_add_ti)
-print(f'C-index (train): {model_gbsa_add_ti.score(X_test_add_ti, y_test_add_ti).item():0.3f}')
-ibs_gbsa_add_ti = survshapiq_func.compute_integrated_brier(y_test_add_ti, X_test_add_ti, model_gbsa_add_ti, min_time = 0.04, max_time = 69)
-print(f'Integrated Brier Score (train): {ibs_gbsa_add_ti:0.3f}')
-
-# Fit CoxPH
-model_cox_add_ti = CoxPHSurvivalAnalysis()
-model_cox_add_ti.fit(X_train_add_ti, y_train_add_ti)
-print(f'C-index (train): {model_cox_add_ti.score(X_test_add_ti, y_test_add_ti).item():0.3f}')
-ibs_cox_add_ti = survshapiq_func.compute_integrated_brier(y_test_add_ti, X_test_add_ti, model_cox_add_ti, min_time = 0.04, max_time = 69)
-print(f'Integrated Brier Score (train): {ibs_cox_add_ti:0.3f}')
-
-# Create data point for explanation
-idx = 10
-x_new_add_ti = data_x_add_ti[[idx]]
-#x_new_ti = data_x_ti[1:9]
-print(x_new_add_ti)
-
-###### GROUND TRUTH HAZARD
-# Define the hazard function
-def hazard_func_add_ti(t, x1, x2, x3):
-    
-    # baseline hazard * exp(lp)
-    return 0.015 * np.exp(-1.5 * ((x1 ** 2) - 1) + (2/math.pi) * np.arctan(0.5 * x2) + 0.6 * x3)
-
-# Explain the first row of x_new for every third time point
-# Wrap the hazard function
-def hazard_wrap_add_ti(X, t):
-    return survshapiq_func.hazard_matrix(X, hazard_func_add_ti, t)
-# exact
-explanation_add_ti_haz = survshapiq_func.survshapiq_ground_truth(data_x_add_ti, 
-                                                            x_new_add_ti, 
-                                                            hazard_wrap_add_ti, 
-                                                            times=model_gbsa_add_ti.unique_times_[::5], 
-                                                            budget=2**8, 
-                                                            max_order=2, 
-                                                            exact=True,
-                                                            feature_names = data_x_add_ti_df.columns)
-
-survshapiq_func.plot_interact(explanations_all = explanation_add_ti_haz, 
-                              model = None,
-                              times=model_gbsa_add_ti.unique_times_[::5], 
-                              x_new = x_new_add_ti, 
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_gt_add_ti_haz.pdf",
-                              data_x = data_x_add_ti,
-                              survival_fn = hazard_wrap_add_ti,
-                              ylabel="Attribution $h(t|x)$",
-                              label_fontsize=16,
-                              tick_fontsize=14,
-                              figsize=(10,6),
-                              idx_plot=idx, 
-                              smooth=True, 
-                              smooth_window=100,
-                              smooth_poly=1) 
-
-
-###### GROUND TRUTH LOG HAZARD
-# Define the log hazard function
-def log_hazard_func_add_ti(t, x1, x2, x3):
-
-    # log(baseline hazard * exp(lp))
-    return np.log(0.015 * np.exp(-1.5 * ((x1 ** 2) - 1) + (2/math.pi) * np.arctan(0.5 * x2) + 0.6 * x3))
-
-# Explain the first row of x_new for every third time point
-# Wrap the hazard function
-def log_hazard_wrap_add_ti(X, t):
-    return survshapiq_func.hazard_matrix(X, log_hazard_func_add_ti, t)
-# exact
-explanation_add_ti_loghaz = survshapiq_func.survshapiq_ground_truth(data_x_add_ti, 
-                                                            x_new_add_ti, 
-                                                            log_hazard_wrap_add_ti, 
-                                                            times=model_gbsa_add_ti.unique_times_[::5], 
-                                                            budget=2**8, 
-                                                            max_order=2, 
-                                                            exact=True,
-                                                            feature_names = data_x_add_ti_df.columns)
-
-survshapiq_func.plot_interact(explanations_all = explanation_add_ti_loghaz, 
-                              model = None,
-                              times=model_gbsa_add_ti.unique_times_[::5], 
-                              x_new = x_new_add_ti, 
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_gt_add_ti_loghaz.pdf", #gt_td_log_haz_sm_5
-                              data_x = data_x_add_ti,
-                              survival_fn = log_hazard_wrap_add_ti,
-                              ylabel="Attribution $\log(h(t|x))$",
-                              label_fontsize=16,
-                              tick_fontsize=14,
-                              figsize=(10,6),
-                              idx_plot=idx, 
-                              smooth=True,
-                              smooth_window=100,
-                              smooth_poly=1) 
-
-
-###### GROUND TRUTH SURVIVAL
-# Explain the first row of x_new for every third time point
-# Wrap the survival function
-def surv_from_hazard_add_ti_wrap(X, t):
-    return survshapiq_func.survival_from_hazard(X, hazard_func_add_ti, t)
-# exact
-explanation_add_ti_surv = survshapiq_func.survshapiq_ground_truth(data_x_add_ti, 
-                                                            x_new_add_ti, 
-                                                            surv_from_hazard_add_ti_wrap, 
-                                                            times=model_gbsa_add_ti.unique_times_[::5], 
-                                                            budget=2**8, 
-                                                            max_order=2, 
-                                                            exact=True,
-                                                            feature_names = data_x_add_ti_df.columns)
-
-survshapiq_func.plot_interact(explanations_all = explanation_add_ti_surv, 
-                              model = None,
-                              times=model_gbsa_add_ti.unique_times_[::5], 
-                              x_new = x_new_add_ti, 
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_gt_add_ti_surv.pdf",
-                              data_x = data_x_add_ti,
-                              survival_fn = surv_from_hazard_add_ti_wrap,
-                              ylabel="Attribution $S(t|x)$",
-                              label_fontsize=16,
-                              tick_fontsize=14,
-                              figsize=(10,6),
-                              idx_plot=idx, 
-                              smooth=True,
-                              smooth_window=100,
-                              smooth_poly=1) 
-
-###### MODEL SURVIVAL
-# gbsa 
-explanation_add_ti_gbsa = survshapiq_func.survshapiq(model_gbsa_add_ti, 
-                                                    X_train_add_ti, 
-                                                    x_new_add_ti, 
-                                                    time_stride=5, 
-                                                    budget=2**8, 
-                                                    max_order=2, 
-                                                    exact=True, 
-                                                    feature_names = data_x_add_ti_df.columns)
-
-survshapiq_func.plot_interact(explanations_all = explanation_add_ti_gbsa, 
-                              model = model_gbsa_add_ti,
-                              x_new = x_new_add_ti, 
-                              times = model_gbsa_add_ti.unique_times_[::5],
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_gbsa_add_ti_surv.pdf",
-                              compare_plots = True, 
-                              data_x = data_x_add_ti,
-                              ylabel="Attribution $\hat{S}(t|x)$",
-                              label_fontsize=16,
-                              tick_fontsize=14,
-                              figsize=(10,6),
-                              idx_plot=idx,
-                              smooth=True,
-                              smooth_window=100,
-                              smooth_poly=1) 
-
-# coxph
-explanation_add_ti_cox = survshapiq_func.survshapiq(model_cox_add_ti, 
-                                                    X_train_add_ti, 
-                                                    x_new_add_ti, 
-                                                    time_stride=5, 
-                                                    budget=2**8, 
-                                                    max_order=2, 
-                                                    exact=True, 
-                                                    feature_names = data_x_add_ti_df.columns)
-
-survshapiq_func.plot_interact(explanations_all = explanation_add_ti_cox, 
-                              model = model_cox_add_ti,
-                              x_new = x_new_add_ti, 
-                              times=model_cox_add_ti.unique_times_[::5],
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_cox_add_ti_surv.pdf",
-                              compare_plots = True, 
-                              data_x = data_x_add_ti,
-                              ylabel="Attribution $\hat{S}(t|x)$",
-                              label_fontsize=16,
-                              tick_fontsize=14,
-                              figsize=(10,6),
-                              idx_plot=idx,
-                              smooth=True,
-                              smooth_window=100,
-                              smooth_poly=1) 
-
-
-
-################ GENERAL ADDITIVE MODEL
-###### TIME-INDEPENDENCE 
-# Load simulated data DataFrame
-simdata_genadd_ti = pd.read_csv("/home/slangbei/survshapiq/survshapiq/simulation/simdata_genadd_ti.csv")
+# load simulated data DataFrame
+simdata_genadd_ti = pd.read_csv(f"{path_data}/6_simdata_genadd_ti.csv")
 print(simdata_genadd_ti.head())
 simdata_genadd_ti
 
-# Convert eventtime and status columns to a structured array
+# convert eventtime and status columns to a structured array
 data_y_genadd_ti, data_x_genadd_ti_df = survshapiq_func.prepare_survival_data(simdata_genadd_ti)
 print(data_y_genadd_ti)
 print(data_x_genadd_ti_df.head())
@@ -846,38 +1074,38 @@ X_train_genadd_ti, X_test_genadd_ti, y_train_genadd_ti, y_test_genadd_ti = train
     test_size=0.2,   
     random_state=42, 
     stratify=None    
-)     
+)
 
-# Fit GradientBoostingSurvivalAnalysis
+# fit GradientBoostingSurvivalAnalysis
 model_gbsa_genadd_ti = GradientBoostingSurvivalAnalysis()
 model_gbsa_genadd_ti.fit(X_train_genadd_ti, y_train_genadd_ti)
-print(f'C-index (train): {model_gbsa_genadd_ti.score(X_train_genadd_ti, y_train_genadd_ti).item():0.3f}')
-ibs_gbsa_genadd_ti = survshapiq_func.compute_integrated_brier(y_train_genadd_ti, X_train_genadd_ti, model_gbsa_genadd_ti, min_time = 0.04, max_time = 69)
+print(f'C-index (train): {model_gbsa_genadd_ti.score(X_test_genadd_ti, y_test_genadd_ti).item():0.3f}')
+ibs_gbsa_genadd_ti = survshapiq_func.compute_integrated_brier(y_test_genadd_ti, X_test_genadd_ti, model_gbsa_genadd_ti, min_time = 0.16, max_time = 69)
 print(f'Integrated Brier Score (train): {ibs_gbsa_genadd_ti:0.3f}')
 
-# Fit CoxPH
+# fit CoxPH
 model_cox_genadd_ti = CoxPHSurvivalAnalysis()
 model_cox_genadd_ti.fit(X_train_genadd_ti, y_train_genadd_ti)
-print(f'C-index (train): {model_cox_genadd_ti.score(X_train_genadd_ti, y_train_genadd_ti).item():0.3f}')
-ibs_cox_genadd_ti = survshapiq_func.compute_integrated_brier(y_train_genadd_ti, X_train_genadd_ti, model_cox_genadd_ti, min_time = 0.04, max_time = 69)
-print(f'Integrated Brier Score (train): {ibs_cox_genadd_ti:0.3f}')
+print(f'C-index (train): {model_cox_genadd_ti.score(X_test_genadd_ti, y_test_genadd_ti).item():0.3f}')
+ibs_cox_linear_genadd_ti = survshapiq_func.compute_integrated_brier(y_test_genadd_ti, X_test_genadd_ti, model_cox_genadd_ti, min_time = 0.08, max_time = 69)
+print(f'Integrated Brier Score (train): {ibs_cox_linear_genadd_ti:0.3f}')
 
-# Create data point for explanation
-idx = 10
+
+# create data point for explanation
+idx = 7
 x_new_genadd_ti = data_x_genadd_ti[[idx]]
-#x_new_ti = data_x_ti[1:9]
 print(x_new_genadd_ti)
 
 ###### GROUND TRUTH HAZARD
-# Define the hazard function
+# define the hazard function
 def hazard_func_genadd_ti(t, x1, x2, x3):
-    # nonlinear transformations
-    return 0.01 * np.exp(0.2 * x1 - 0.3 * ((x1 ** 2) - 1) + 0.5 * ((2 / np.pi) * np.arctan(0.7 * x2)) - 0.4 * x3 + 0.2 * x1 * x2 + 0.3 * ((x1 ** 2 - 1) * x3))
+    return (0.03 * np.exp((0.4 * x1**2) - (0.8 * (2/np.pi) * np.arctan(0.7 * x2)) - (0.6 * x3)))
 
-# Explain the first row of x_new for every third time point
-# Wrap the hazard function
+# explain
+# wrap the hazard function
 def hazard_wrap_genadd_ti(X, t):
     return survshapiq_func.hazard_matrix(X, hazard_func_genadd_ti, t)
+
 # exact
 explanation_genadd_ti_haz = survshapiq_func.survshapiq_ground_truth(data_x_genadd_ti, 
                                                             x_new_genadd_ti, 
@@ -885,6 +1113,7 @@ explanation_genadd_ti_haz = survshapiq_func.survshapiq_ground_truth(data_x_genad
                                                             times=model_gbsa_genadd_ti.unique_times_[::5], 
                                                             budget=2**8, 
                                                             max_order=2, 
+                                                            index= "k-SII",
                                                             exact=True,
                                                             feature_names = data_x_genadd_ti_df.columns)
 
@@ -892,30 +1121,29 @@ survshapiq_func.plot_interact(explanations_all = explanation_genadd_ti_haz,
                               model = None,
                               times=model_gbsa_genadd_ti.unique_times_[::5], 
                               x_new = x_new_genadd_ti, 
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_gt_genadd_ti_haz.pdf",
+                              save_path = f"{path_plots}/6_genadd_ti/plot_gt_genadd_ti_haz.pdf", 
                               data_x = data_x_genadd_ti,
                               survival_fn = hazard_wrap_genadd_ti,
                               ylabel="Attribution $h(t|x)$",
+                              compare_plots="Diff",
                               label_fontsize=16,
                               tick_fontsize=14,
                               figsize=(10,6),
                               idx_plot=idx, 
-                              smooth=True, 
-                              smooth_window=200,
+                              smooth=True,
+                              smooth_window=120,
                               smooth_poly=1) 
 
-
 ###### GROUND TRUTH LOG HAZARD
-# Define the hazard function
+# define the log hazard function
 def log_hazard_func_genadd_ti(t, x1, x2, x3):
-    # log(baseline hazard * exp(lp))
-    return  np.log(0.01 * np.exp(0.2 * x1 - 0.3 * ((x1 ** 2) - 1) + 0.5 * ((2 / np.pi) * np.arctan(0.7 * x2)) - 0.4 * x3 + 0.2 * x1 * x2 + 0.3 * ((x1 ** 2 - 1) * x3)))
+    return np.log((0.03 * np.exp((0.4 * x1**2) - (0.8 * (2/np.pi) * np.arctan(0.7 * x2)) - (0.6 * x3))))
 
-
-# Explain the first row of x_new for every third time point
-# Wrap the hazard function
+# explain
+# wrap the hazard function
 def log_hazard_wrap_genadd_ti(X, t):
     return survshapiq_func.hazard_matrix(X, log_hazard_func_genadd_ti, t)
+
 # exact
 explanation_genadd_ti_loghaz = survshapiq_func.survshapiq_ground_truth(data_x_genadd_ti, 
                                                             x_new_genadd_ti, 
@@ -923,6 +1151,7 @@ explanation_genadd_ti_loghaz = survshapiq_func.survshapiq_ground_truth(data_x_ge
                                                             times=model_gbsa_genadd_ti.unique_times_[::5], 
                                                             budget=2**8, 
                                                             max_order=2, 
+                                                            index= "k-SII",
                                                             exact=True,
                                                             feature_names = data_x_genadd_ti_df.columns)
 
@@ -930,23 +1159,26 @@ survshapiq_func.plot_interact(explanations_all = explanation_genadd_ti_loghaz,
                               model = None,
                               times=model_gbsa_genadd_ti.unique_times_[::5], 
                               x_new = x_new_genadd_ti, 
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_gt_genadd_ti_loghaz.pdf",
+                              save_path = f"{path_plots}/6_genadd_ti/plot_gt_genadd_ti_loghaz.pdf",
                               data_x = data_x_genadd_ti,
                               survival_fn = log_hazard_wrap_genadd_ti,
+                              compare_plots="Diff",
                               ylabel="Attribution $\log(h(t|x))$",
                               label_fontsize=16,
                               tick_fontsize=14,
                               figsize=(10,6),
                               idx_plot=idx, 
-                              smooth=True, 
+                              smooth=True,
                               smooth_window=100,
                               smooth_poly=1) 
 
 
 ###### GROUND TRUTH SURVIVAL
-# Wrap the survival function
+# explain
+# wrap the survival function
 def surv_from_hazard_genadd_ti_wrap(X, t):
     return survshapiq_func.survival_from_hazard(X, hazard_func_genadd_ti, t)
+
 # exact
 explanation_genadd_ti_surv = survshapiq_func.survshapiq_ground_truth(data_x_genadd_ti, 
                                                             x_new_genadd_ti, 
@@ -954,15 +1186,18 @@ explanation_genadd_ti_surv = survshapiq_func.survshapiq_ground_truth(data_x_gena
                                                             times=model_gbsa_genadd_ti.unique_times_[::5], 
                                                             budget=2**8, 
                                                             max_order=2, 
+                                                            index= "k-SII",
                                                             exact=True,
                                                             feature_names = data_x_genadd_ti_df.columns)
+
 survshapiq_func.plot_interact(explanations_all = explanation_genadd_ti_surv, 
                               model = None,
                               times=model_gbsa_genadd_ti.unique_times_[::5], 
                               x_new = x_new_genadd_ti, 
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_gt_genadd_ti_surv.pdf",
+                              save_path = f"{path_plots}/6_genadd_ti/plot_gt_genadd_ti_surv.pdf",
                               data_x = data_x_genadd_ti,
                               survival_fn = surv_from_hazard_genadd_ti_wrap,
+                              compare_plots="Diff",
                               ylabel="Attribution $S(t|x)$",
                               label_fontsize=16,
                               tick_fontsize=14,
@@ -972,23 +1207,25 @@ survshapiq_func.plot_interact(explanations_all = explanation_genadd_ti_surv,
                               smooth_window=50,
                               smooth_poly=1) 
 
+
 ###### MODEL SURVIVAL
-# gbsa 
+# gbsa
 explanation_genadd_ti_gbsa = survshapiq_func.survshapiq(model_gbsa_genadd_ti, 
                                                     X_train_genadd_ti, 
                                                     x_new_genadd_ti, 
                                                     time_stride=5, 
                                                     budget=2**8, 
                                                     max_order=2, 
+                                                    index= "k-SII",
                                                     exact=True, 
                                                     feature_names = data_x_genadd_ti_df.columns)
 
 survshapiq_func.plot_interact(explanations_all = explanation_genadd_ti_gbsa, 
                               model = model_gbsa_genadd_ti,
                               x_new = x_new_genadd_ti, 
-                              times=model_gbsa_genadd_ti.unique_times_[::5],
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_gbsa_genadd_ti_surv.pdf",
-                              compare_plots = True, 
+                              times = model_gbsa_genadd_ti.unique_times_[::5],
+                              save_path = f"{path_plots}/6_genadd_ti/plot_gbsa_genadd_ti_surv.pdf",
+                              compare_plots = "Diff", 
                               data_x = data_x_genadd_ti,
                               ylabel="Attribution $\hat{S}(t|x)$",
                               label_fontsize=16,
@@ -996,25 +1233,26 @@ survshapiq_func.plot_interact(explanations_all = explanation_genadd_ti_gbsa,
                               figsize=(10,6),
                               idx_plot=idx,
                               smooth=True,
-                              smooth_window=50,
+                              smooth_window=40,
                               smooth_poly=1) 
 
 # coxph
-explanation_cox_genadd_ti = survshapiq_func.survshapiq(model_cox_genadd_ti, 
+explanation_genadd_ti_cox = survshapiq_func.survshapiq(model_cox_genadd_ti, 
                                                     X_train_genadd_ti, 
                                                     x_new_genadd_ti, 
                                                     time_stride=5, 
                                                     budget=2**8, 
                                                     max_order=2, 
+                                                    index= "k-SII",
                                                     exact=True, 
                                                     feature_names = data_x_genadd_ti_df.columns)
 
-survshapiq_func.plot_interact(explanations_all = explanation_cox_genadd_ti, 
+survshapiq_func.plot_interact(explanations_all = explanation_genadd_ti_cox, 
                               model = model_cox_genadd_ti,
                               x_new = x_new_genadd_ti, 
-                              times=model_cox_genadd_ti.unique_times_[::5] ,
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_cox_genadd_ti_surv.pdf",
-                              compare_plots = True, 
+                              times = model_cox_genadd_ti.unique_times_[::5],
+                              save_path = f"{path_plots}/6_genadd_ti/plot_cox_genadd_ti_surv.pdf",
+                              compare_plots = "Diff", 
                               data_x = data_x_genadd_ti,
                               ylabel="Attribution $\hat{S}(t|x)$",
                               label_fontsize=16,
@@ -1026,14 +1264,16 @@ survshapiq_func.plot_interact(explanations_all = explanation_cox_genadd_ti,
                               smooth_poly=1) 
 
 
-################ GENERAL ADDITIVE MODEL
-###### TIME-DEPENDENCE IN MAIN EFFECTS
-# Load simulated data DataFrame
-simdata_genadd_tdmain = pd.read_csv("/home/slangbei/survshapiq/survshapiq/simulation/simdata_genadd_td_main.csv")
+#---------------------------
+# 7) Generalized Additive G(t|x), TD Main (no interactions)
+#---------------------------
+
+# load simulated data DataFrame
+simdata_genadd_tdmain = pd.read_csv(f"{path_data}/7_simdata_genadd_tdmain.csv")
 print(simdata_genadd_tdmain.head())
 simdata_genadd_tdmain
 
-# Convert eventtime and status columns to a structured array
+# convert eventtime and status columns to a structured array
 data_y_genadd_tdmain, data_x_genadd_tdmain_df = survshapiq_func.prepare_survival_data(simdata_genadd_tdmain)
 print(data_y_genadd_tdmain)
 print(data_x_genadd_tdmain_df.head())
@@ -1045,37 +1285,36 @@ X_train_genadd_tdmain, X_test_genadd_tdmain, y_train_genadd_tdmain, y_test_genad
     stratify=None    
 )
 
-# Fit GradientBoostingSurvivalAnalysis
+# fit GradientBoostingSurvivalAnalysis
 model_gbsa_genadd_tdmain = GradientBoostingSurvivalAnalysis()
 model_gbsa_genadd_tdmain.fit(X_train_genadd_tdmain, y_train_genadd_tdmain)
 print(f'C-index (train): {model_gbsa_genadd_tdmain.score(X_test_genadd_tdmain, y_test_genadd_tdmain).item():0.3f}')
-ibs_gbsa_genadd_tdmain = survshapiq_func.compute_integrated_brier(y_test_genadd_tdmain, X_test_genadd_tdmain, model_gbsa_genadd_tdmain, min_time = 0.04, max_time = 69)
+ibs_gbsa_genadd_tdmain = survshapiq_func.compute_integrated_brier(y_test_genadd_tdmain, X_test_genadd_tdmain, model_gbsa_genadd_tdmain, min_time = 0.9, max_time = 69)
 print(f'Integrated Brier Score (train): {ibs_gbsa_genadd_tdmain:0.3f}')
 
-# Fit CoxPH
+# fit CoxPH
 model_cox_genadd_tdmain = CoxPHSurvivalAnalysis()
 model_cox_genadd_tdmain.fit(X_train_genadd_tdmain, y_train_genadd_tdmain)
 print(f'C-index (train): {model_cox_genadd_tdmain.score(X_test_genadd_tdmain, y_test_genadd_tdmain).item():0.3f}')
-ibs_cox_genadd_tdmain = survshapiq_func.compute_integrated_brier(y_test_genadd_tdmain, X_test_genadd_tdmain, model_cox_genadd_tdmain, min_time = 0.04, max_time = 69)
+ibs_cox_genadd_tdmain = survshapiq_func.compute_integrated_brier(y_test_genadd_tdmain, X_test_genadd_tdmain, model_cox_genadd_tdmain, min_time = 0.09, max_time = 69)
 print(f'Integrated Brier Score (train): {ibs_cox_genadd_tdmain:0.3f}')
 
-# Create data point for explanation
-idx = 10
+
+# create data point for explanation
+idx = 7
 x_new_genadd_tdmain = data_x_genadd_tdmain[[idx]]
-#x_new_td = data_x_td[1:9]
 print(x_new_genadd_tdmain)
 
-
 ###### GROUND TRUTH HAZARD
-# Define the hazard function
+# define the hazard function
 def hazard_func_genadd_tdmain(t, x1, x2, x3):
-    # baseline hazard * exp(lp)
-    return 0.01 * np.exp(0.2 * x1 - 0.4 * (x1 * np.log(t + 1)) - 0.3 * ((x1 ** 2) - 1) + 0.5 * ((2 / np.pi) * np.arctan(0.7 * x2)) - 0.4 * x3 + 0.2 * x1 * x2 + 0.3 * ((x1 ** 2 - 1) * x3))
+    return (0.03 * np.exp((0.4 * x1**2 * np.log(t + 1)) - (0.8 * (2/np.pi) * np.arctan(0.7 * x2)) - (0.6 * x3)))
 
-# Explain the first row of x_new for every third time point
-# Wrap the hazard function
+# explain
+# wrap the hazard function
 def hazard_wrap_genadd_tdmain(X, t):
     return survshapiq_func.hazard_matrix(X, hazard_func_genadd_tdmain, t)
+
 # exact
 explanation_genadd_tdmain_haz = survshapiq_func.survshapiq_ground_truth(data_x_genadd_tdmain, 
                                                             x_new_genadd_tdmain, 
@@ -1083,6 +1322,7 @@ explanation_genadd_tdmain_haz = survshapiq_func.survshapiq_ground_truth(data_x_g
                                                             times=model_gbsa_genadd_tdmain.unique_times_[::5], 
                                                             budget=2**8, 
                                                             max_order=2, 
+                                                            index= "k-SII",
                                                             exact=True,
                                                             feature_names = data_x_genadd_tdmain_df.columns)
 
@@ -1090,30 +1330,29 @@ survshapiq_func.plot_interact(explanations_all = explanation_genadd_tdmain_haz,
                               model = None,
                               times=model_gbsa_genadd_tdmain.unique_times_[::5], 
                               x_new = x_new_genadd_tdmain, 
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_gt_genadd_tdmain_haz.pdf",
+                              save_path = f"{path_plots}/7_genadd_tdmain/plot_gt_genadd_tdmain_haz.pdf", 
                               data_x = data_x_genadd_tdmain,
                               survival_fn = hazard_wrap_genadd_tdmain,
                               ylabel="Attribution $h(t|x)$",
+                              compare_plots="Diff",
                               label_fontsize=16,
                               tick_fontsize=14,
                               figsize=(10,6),
                               idx_plot=idx, 
-                              smooth=True, 
-                              smooth_window=150,
+                              smooth=True,
+                              smooth_window=20,
                               smooth_poly=1) 
 
-
 ###### GROUND TRUTH LOG HAZARD
-# Define the log hazard function
+# define the log hazard function
 def log_hazard_func_genadd_tdmain(t, x1, x2, x3):
-    # baseline hazard * exp(lp)
-    return np.log(0.01 * np.exp(0.2 * x1 - 0.4 * (x1 * np.log(t + 1)) - 0.3 * ((x1 ** 2) - 1) + 0.5 * ((2 / np.pi) * np.arctan(0.7 * x2)) - 0.4 * x3 + 0.2 * x1 * x2 + 0.3 * ((x1 ** 2 - 1) * x3)))
+    return np.log((0.03 * np.exp((0.4 * x1**2) * np.log(t+1) - (0.8 * (2/np.pi) * np.arctan(0.7 * x2)) - (0.6 * x3))))
 
-
-# Explain the first row of x_new for every third time point
-# Wrap the hazard function
+# explain
+# wrap the hazard function
 def log_hazard_wrap_genadd_tdmain(X, t):
     return survshapiq_func.hazard_matrix(X, log_hazard_func_genadd_tdmain, t)
+
 # exact
 explanation_genadd_tdmain_loghaz = survshapiq_func.survshapiq_ground_truth(data_x_genadd_tdmain, 
                                                             x_new_genadd_tdmain, 
@@ -1121,6 +1360,7 @@ explanation_genadd_tdmain_loghaz = survshapiq_func.survshapiq_ground_truth(data_
                                                             times=model_gbsa_genadd_tdmain.unique_times_[::5], 
                                                             budget=2**8, 
                                                             max_order=2, 
+                                                            index= "k-SII",
                                                             exact=True,
                                                             feature_names = data_x_genadd_tdmain_df.columns)
 
@@ -1128,23 +1368,26 @@ survshapiq_func.plot_interact(explanations_all = explanation_genadd_tdmain_logha
                               model = None,
                               times=model_gbsa_genadd_tdmain.unique_times_[::5], 
                               x_new = x_new_genadd_tdmain, 
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_gt_genadd_tdmain_loghaz.pdf",
+                              save_path = f"{path_plots}/7_genadd_tdmain/plot_gt_genadd_tdmain_loghaz.pdf",
                               data_x = data_x_genadd_tdmain,
                               survival_fn = log_hazard_wrap_genadd_tdmain,
+                              compare_plots="Diff",
                               ylabel="Attribution $\log(h(t|x))$",
                               label_fontsize=16,
                               tick_fontsize=14,
                               figsize=(10,6),
                               idx_plot=idx, 
-                              smooth=True, 
+                              smooth=True,
                               smooth_window=100,
                               smooth_poly=1) 
 
 
 ###### GROUND TRUTH SURVIVAL
-# Wrap the survival function
+# explain
+# wrap the survival function
 def surv_from_hazard_genadd_tdmain_wrap(X, t):
     return survshapiq_func.survival_from_hazard(X, hazard_func_genadd_tdmain, t)
+
 # exact
 explanation_genadd_tdmain_surv = survshapiq_func.survshapiq_ground_truth(data_x_genadd_tdmain, 
                                                             x_new_genadd_tdmain, 
@@ -1152,15 +1395,18 @@ explanation_genadd_tdmain_surv = survshapiq_func.survshapiq_ground_truth(data_x_
                                                             times=model_gbsa_genadd_tdmain.unique_times_[::5], 
                                                             budget=2**8, 
                                                             max_order=2, 
+                                                            index= "k-SII",
                                                             exact=True,
                                                             feature_names = data_x_genadd_tdmain_df.columns)
+
 survshapiq_func.plot_interact(explanations_all = explanation_genadd_tdmain_surv, 
                               model = None,
                               times=model_gbsa_genadd_tdmain.unique_times_[::5], 
                               x_new = x_new_genadd_tdmain, 
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_gt_genadd_tdmain_surv.pdf",
+                              save_path = f"{path_plots}/7_genadd_tdmain/plot_gt_genadd_tdmain_surv.pdf",
                               data_x = data_x_genadd_tdmain,
                               survival_fn = surv_from_hazard_genadd_tdmain_wrap,
+                              compare_plots="Diff",
                               ylabel="Attribution $S(t|x)$",
                               label_fontsize=16,
                               tick_fontsize=14,
@@ -1170,23 +1416,25 @@ survshapiq_func.plot_interact(explanations_all = explanation_genadd_tdmain_surv,
                               smooth_window=50,
                               smooth_poly=1) 
 
+
 ###### MODEL SURVIVAL
-# gbsg 
+# gbsa
 explanation_genadd_tdmain_gbsa = survshapiq_func.survshapiq(model_gbsa_genadd_tdmain, 
                                                     X_train_genadd_tdmain, 
                                                     x_new_genadd_tdmain, 
                                                     time_stride=5, 
                                                     budget=2**8, 
                                                     max_order=2, 
+                                                    index= "k-SII",
                                                     exact=True, 
                                                     feature_names = data_x_genadd_tdmain_df.columns)
 
 survshapiq_func.plot_interact(explanations_all = explanation_genadd_tdmain_gbsa, 
                               model = model_gbsa_genadd_tdmain,
                               x_new = x_new_genadd_tdmain, 
-                              times=model_gbsa_genadd_tdmain.unique_times_[::5],
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_gbsa_genadd_tdmain_surv.pdf",
-                              compare_plots = True, 
+                              times = model_gbsa_genadd_tdmain.unique_times_[::5],
+                              save_path = f"{path_plots}/7_genadd_tdmain/plot_gbsa_genadd_tdmain_surv.pdf",
+                              compare_plots = "Diff", 
                               data_x = data_x_genadd_tdmain,
                               ylabel="Attribution $\hat{S}(t|x)$",
                               label_fontsize=16,
@@ -1204,15 +1452,16 @@ explanation_genadd_tdmain_cox = survshapiq_func.survshapiq(model_cox_genadd_tdma
                                                     time_stride=5, 
                                                     budget=2**8, 
                                                     max_order=2, 
+                                                    index= "k-SII",
                                                     exact=True, 
                                                     feature_names = data_x_genadd_tdmain_df.columns)
 
 survshapiq_func.plot_interact(explanations_all = explanation_genadd_tdmain_cox, 
                               model = model_cox_genadd_tdmain,
                               x_new = x_new_genadd_tdmain, 
-                              times=model_cox_genadd_tdmain.unique_times_[::5] ,
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_cox_genadd_tdmain_surv.pdf",
-                              compare_plots = True, 
+                              times = model_cox_genadd_tdmain.unique_times_[::5],
+                              save_path = f"{path_plots}/7_genadd_tdmain/plot_cox_genadd_tdmain_surv.pdf",
+                              compare_plots = "Diff", 
                               data_x = data_x_genadd_tdmain,
                               ylabel="Attribution $\hat{S}(t|x)$",
                               label_fontsize=16,
@@ -1223,15 +1472,435 @@ survshapiq_func.plot_interact(explanations_all = explanation_genadd_tdmain_cox,
                               smooth_window=50,
                               smooth_poly=1) 
 
+#---------------------------
+# 8) Generalized Additive G(t|x), TI (interactions)
+#---------------------------
 
-################ GENERAL ADDITIVE MODEL
-###### TIME-DEPENDENCE IN INTERACTIONS
-# Load simulated data DataFrame
-simdata_genadd_tdinter = pd.read_csv("/home/slangbei/survshapiq/survshapiq/simulation/simdata_genadd_td_interaction.csv")
+# load simulated data DataFrame
+simdata_genadd_ti_inter = pd.read_csv(f"{path_data}/8_simdata_genadd_ti_inter.csv")
+print(simdata_genadd_ti_inter.head())
+simdata_genadd_ti_inter
+
+# convert eventtime and status columns to a structured array
+data_y_genadd_ti_inter, data_x_genadd_ti_inter_df = survshapiq_func.prepare_survival_data(simdata_genadd_ti_inter)
+print(data_y_genadd_ti_inter)
+print(data_x_genadd_ti_inter_df.head())
+data_x_genadd_ti_inter = data_x_genadd_ti_inter_df.values
+X_train_genadd_ti_inter, X_test_genadd_ti_inter, y_train_genadd_ti_inter, y_test_genadd_ti_inter = train_test_split(
+    data_x_genadd_ti_inter, data_y_genadd_ti_inter, 
+    test_size=0.2,   
+    random_state=42, 
+    stratify=None    
+)
+
+# fit GradientBoostingSurvivalAnalysis
+model_gbsa_genadd_ti_inter = GradientBoostingSurvivalAnalysis()
+model_gbsa_genadd_ti_inter.fit(X_train_genadd_ti_inter, y_train_genadd_ti_inter)
+print(f'C-index (train): {model_gbsa_genadd_ti_inter.score(X_test_genadd_ti_inter, y_test_genadd_ti_inter).item():0.3f}')
+ibs_gbsa_genadd_ti_inter = survshapiq_func.compute_integrated_brier(y_test_genadd_ti_inter, X_test_genadd_ti_inter, model_gbsa_genadd_ti_inter, min_time = 0.16, max_time = 69)
+print(f'Integrated Brier Score (train): {ibs_gbsa_genadd_ti_inter:0.3f}')
+
+# fit CoxPH
+model_cox_genadd_ti_inter = CoxPHSurvivalAnalysis()
+model_cox_genadd_ti_inter.fit(X_train_genadd_ti_inter, y_train_genadd_ti_inter)
+print(f'C-index (train): {model_cox_genadd_ti_inter.score(X_test_genadd_ti_inter, y_test_genadd_ti_inter).item():0.3f}')
+ibs_cox_linear_ti_inter = survshapiq_func.compute_integrated_brier(y_test_genadd_ti_inter, X_test_genadd_ti_inter, model_cox_genadd_ti_inter, min_time = 0.12, max_time = 69)
+print(f'Integrated Brier Score (train): {ibs_cox_linear_ti_inter:0.3f}')
+
+
+# create data point for explanation
+idx = 7
+x_new_genadd_ti_inter = data_x_genadd_ti_inter[[idx]]
+print(x_new_genadd_ti_inter)
+
+###### GROUND TRUTH HAZARD
+# define the hazard function
+def hazard_func_genadd_ti_inter(t, x1, x2, x3):
+    return (0.03 * np.exp((0.4 * x1**2) - (0.8 * (2/np.pi) * np.arctan(0.7 * x2)) - (0.6 * x3) - (0.5 * x1 * x2) + (0.2 * x1 * x3**2)))
+
+# explain
+# wrap the hazard function
+def hazard_wrap_genadd_ti_inter(X, t):
+    return survshapiq_func.hazard_matrix(X, hazard_func_genadd_ti_inter, t)
+
+# exact
+explanation_genadd_ti_inter_haz = survshapiq_func.survshapiq_ground_truth(data_x_genadd_ti_inter, 
+                                                            x_new_genadd_ti_inter, 
+                                                            hazard_wrap_genadd_ti_inter, 
+                                                            times=model_gbsa_genadd_ti_inter.unique_times_[::5], 
+                                                            budget=2**8, 
+                                                            max_order=2, 
+                                                            index= "k-SII",
+                                                            exact=True,
+                                                            feature_names = data_x_genadd_ti_inter_df.columns)
+
+survshapiq_func.plot_interact(explanations_all = explanation_genadd_ti_inter_haz, 
+                              model = None,
+                              times=model_gbsa_genadd_ti_inter.unique_times_[::5], 
+                              x_new = x_new_genadd_ti_inter, 
+                              save_path = f"{path_plots}/8_genadd_ti_inter/plot_gt_genadd_ti_inter_haz.pdf", 
+                              data_x = data_x_genadd_ti_inter,
+                              survival_fn = hazard_wrap_genadd_ti_inter,
+                              ylabel="Attribution $h(t|x)$",
+                              compare_plots="Diff",
+                              label_fontsize=16,
+                              tick_fontsize=14,
+                              figsize=(10,6),
+                              idx_plot=idx, 
+                              smooth=True,
+                              smooth_window=20,
+                              smooth_poly=1) 
+
+###### GROUND TRUTH LOG HAZARD
+# define the log hazard function
+def log_hazard_func_genadd_ti_inter(t, x1, x2, x3):
+    return np.log((0.03 * np.exp((0.4 * x1**2) - (0.8 * (2/np.pi) * np.arctan(0.7 * x2)) - (0.6 * x3) - (0.5 * x1 * x2) + (0.2 * x1 * x3**2))))
+
+# explain
+# wrap the hazard function
+def log_hazard_wrap_genadd_ti_inter(X, t):
+    return survshapiq_func.hazard_matrix(X, log_hazard_func_genadd_ti_inter, t)
+
+# exact
+explanation_genadd_ti_inter_loghaz = survshapiq_func.survshapiq_ground_truth(data_x_genadd_ti_inter, 
+                                                            x_new_genadd_ti_inter, 
+                                                            log_hazard_wrap_genadd_ti_inter, 
+                                                            times=model_gbsa_genadd_ti_inter.unique_times_[::5], 
+                                                            budget=2**8, 
+                                                            max_order=2, 
+                                                            index= "k-SII",
+                                                            exact=True,
+                                                            feature_names = data_x_genadd_ti_inter_df.columns)
+
+survshapiq_func.plot_interact(explanations_all = explanation_genadd_ti_inter_loghaz, 
+                              model = None,
+                              times=model_gbsa_genadd_ti_inter.unique_times_[::5], 
+                              x_new = x_new_genadd_ti_inter, 
+                              save_path = f"{path_plots}/8_genadd_ti_inter/plot_gt_genadd_ti_inter_loghaz.pdf",
+                              data_x = data_x_genadd_ti_inter,
+                              survival_fn = log_hazard_wrap_genadd_ti_inter,
+                              compare_plots="Diff",
+                              ylabel="Attribution $\log(h(t|x))$",
+                              label_fontsize=16,
+                              tick_fontsize=14,
+                              figsize=(10,6),
+                              idx_plot=idx, 
+                              smooth=True,
+                              smooth_window=100,
+                              smooth_poly=1) 
+
+
+###### GROUND TRUTH SURVIVAL
+# explain
+# wrap the survival function
+def surv_from_hazard_genadd_ti_inter_wrap(X, t):
+    return survshapiq_func.survival_from_hazard(X, hazard_func_genadd_ti_inter, t)
+
+# exact
+explanation_genadd_ti_inter_surv = survshapiq_func.survshapiq_ground_truth(data_x_genadd_ti_inter, 
+                                                            x_new_genadd_ti_inter, 
+                                                            surv_from_hazard_genadd_ti_inter_wrap, 
+                                                            times=model_gbsa_genadd_ti_inter.unique_times_[::5], 
+                                                            budget=2**8, 
+                                                            max_order=2, 
+                                                            index= "k-SII",
+                                                            exact=True,
+                                                            feature_names = data_x_genadd_ti_inter_df.columns)
+
+survshapiq_func.plot_interact(explanations_all = explanation_genadd_ti_inter_surv, 
+                              model = None,
+                              times=model_gbsa_genadd_ti_inter.unique_times_[::5], 
+                              x_new = x_new_genadd_ti_inter, 
+                              save_path = f"{path_plots}/8_genadd_ti_inter/plot_gt_genadd_ti_inter_surv.pdf",
+                              data_x = data_x_genadd_ti_inter,
+                              survival_fn = surv_from_hazard_genadd_ti_inter_wrap,
+                              compare_plots="Diff",
+                              ylabel="Attribution $S(t|x)$",
+                              label_fontsize=16,
+                              tick_fontsize=14,
+                              figsize=(10,6),
+                              idx_plot=idx, 
+                              smooth=True,
+                              smooth_window=60,
+                              smooth_poly=1) 
+
+
+###### MODEL SURVIVAL
+# gbsa
+explanation_genadd_ti_inter_gbsa = survshapiq_func.survshapiq(model_gbsa_genadd_ti_inter, 
+                                                    X_train_genadd_ti_inter, 
+                                                    x_new_genadd_ti_inter, 
+                                                    time_stride=5, 
+                                                    budget=2**8, 
+                                                    max_order=2, 
+                                                    index= "k-SII",
+                                                    exact=True, 
+                                                    feature_names = data_x_genadd_ti_inter_df.columns)
+
+survshapiq_func.plot_interact(explanations_all = explanation_genadd_ti_inter_gbsa, 
+                              model = model_gbsa_genadd_ti_inter,
+                              x_new = x_new_genadd_ti_inter, 
+                              times = model_gbsa_genadd_ti_inter.unique_times_[::5],
+                              save_path = f"{path_plots}/8_genadd_ti_inter/plot_gbsa_genadd_ti_inter_surv.pdf",
+                              compare_plots = "Diff", 
+                              data_x = data_x_genadd_ti_inter,
+                              ylabel="Attribution $\hat{S}(t|x)$",
+                              label_fontsize=16,
+                              tick_fontsize=14,
+                              figsize=(10,6),
+                              idx_plot=idx,
+                              smooth=True,
+                              smooth_window=60,
+                              smooth_poly=1) 
+
+# coxph
+explanation_genadd_ti_inter_cox = survshapiq_func.survshapiq(model_cox_genadd_ti_inter, 
+                                                    X_train_genadd_ti_inter, 
+                                                    x_new_genadd_ti_inter, 
+                                                    time_stride=5, 
+                                                    budget=2**8, 
+                                                    max_order=2, 
+                                                    index= "k-SII",
+                                                    exact=True, 
+                                                    feature_names = data_x_genadd_ti_inter_df.columns)
+
+survshapiq_func.plot_interact(explanations_all = explanation_genadd_ti_inter_cox, 
+                              model = model_cox_genadd_ti_inter,
+                              x_new = x_new_genadd_ti_inter, 
+                              times = model_cox_genadd_ti_inter.unique_times_[::5],
+                              save_path = f"{path_plots}/8_genadd_ti_inter/plot_cox_genadd_ti_inter_surv.pdf",
+                              compare_plots = "Diff", 
+                              data_x = data_x_genadd_ti_inter,
+                              ylabel="Attribution $\hat{S}(t|x)$",
+                              label_fontsize=16,
+                              tick_fontsize=14,
+                              figsize=(10,6),
+                              idx_plot=idx,
+                              smooth=True,
+                              smooth_window=60,
+                              smooth_poly=1) 
+
+
+#---------------------------
+# 9) Generalized Additive G(t|x), TD Main (interactions)
+#---------------------------
+
+# load simulated data DataFrame
+simdata_genadd_tdmain_inter = pd.read_csv(f"{path_data}/9_simdata_genadd_tdmain_inter.csv")
+print(simdata_genadd_tdmain_inter.head())
+simdata_genadd_tdmain_inter
+
+# convert eventtime and status columns to a structured array
+data_y_genadd_tdmain_inter, data_x_genadd_tdmain_inter_df = survshapiq_func.prepare_survival_data(simdata_genadd_tdmain_inter)
+print(data_y_genadd_tdmain_inter)
+print(data_x_genadd_tdmain_inter_df.head())
+data_x_genadd_tdmain_inter = data_x_genadd_tdmain_inter_df.values
+X_train_genadd_tdmain_inter, X_test_genadd_tdmain_inter, y_train_genadd_tdmain_inter, y_test_genadd_tdmain_inter = train_test_split(
+    data_x_genadd_tdmain_inter, data_y_genadd_tdmain_inter, 
+    test_size=0.2,   
+    random_state=42, 
+    stratify=None    
+)
+
+# fit GradientBoostingSurvivalAnalysis
+model_gbsa_genadd_tdmain_inter = GradientBoostingSurvivalAnalysis()
+model_gbsa_genadd_tdmain_inter.fit(X_train_genadd_tdmain_inter, y_train_genadd_tdmain_inter)
+print(f'C-index (train): {model_gbsa_genadd_tdmain_inter.score(X_test_genadd_tdmain_inter, y_test_genadd_tdmain_inter).item():0.3f}')
+ibs_gbsa_genadd_tdmain_inter = survshapiq_func.compute_integrated_brier(y_test_genadd_tdmain_inter, X_test_genadd_tdmain_inter, model_gbsa_genadd_tdmain_inter, min_time = 0.17, max_time = 69)
+print(f'Integrated Brier Score (train): {ibs_gbsa_genadd_tdmain_inter:0.3f}')
+
+# fit CoxPH
+model_cox_genadd_tdmain_inter = CoxPHSurvivalAnalysis()
+model_cox_genadd_tdmain_inter.fit(X_train_genadd_tdmain_inter, y_train_genadd_tdmain_inter)
+print(f'C-index (train): {model_cox_genadd_tdmain_inter.score(X_test_genadd_tdmain_inter, y_test_genadd_tdmain_inter).item():0.3f}')
+ibs_cox_linear_tdmain_inter = survshapiq_func.compute_integrated_brier(y_test_genadd_tdmain_inter, X_test_genadd_tdmain_inter, model_cox_genadd_tdmain_inter, min_time = 0.17, max_time = 69)
+print(f'Integrated Brier Score (train): {ibs_cox_linear_tdmain_inter:0.3f}')
+
+
+# create data point for explanation
+idx = 7
+x_new_genadd_tdmain_inter = data_x_genadd_tdmain_inter[[idx]]
+print(x_new_genadd_tdmain_inter)
+
+###### GROUND TRUTH HAZARD
+# define the hazard function
+def hazard_func_genadd_tdmain_inter(t, x1, x2, x3):
+    return (0.03 * np.exp((0.4 * x1**2 * np.log(t + 1)) - (0.8 * (2/np.pi) * np.arctan(0.7 * x2)) - (0.6 * x3) - (0.5 * x1 * x2) + (0.2 * x1 * x3**2)))
+
+# explain
+# wrap the hazard function
+def hazard_wrap_genadd_tdmain_inter(X, t):
+    return survshapiq_func.hazard_matrix(X, hazard_func_genadd_tdmain_inter, t)
+
+# exact
+explanation_genadd_tdmain_inter_haz = survshapiq_func.survshapiq_ground_truth(data_x_genadd_tdmain_inter, 
+                                                            x_new_genadd_tdmain_inter, 
+                                                            hazard_wrap_genadd_tdmain_inter, 
+                                                            times=model_gbsa_genadd_tdmain_inter.unique_times_[::5], 
+                                                            budget=2**8, 
+                                                            max_order=2, 
+                                                            index= "k-SII",
+                                                            exact=True,
+                                                            feature_names = data_x_genadd_tdmain_inter_df.columns)
+
+survshapiq_func.plot_interact(explanations_all = explanation_genadd_tdmain_inter_haz, 
+                              model = None,
+                              times=model_gbsa_genadd_tdmain_inter.unique_times_[::5], 
+                              x_new = x_new_genadd_tdmain_inter, 
+                              save_path = f"{path_plots}/9_genadd_tdmain_inter/plot_gt_genadd_tdmain_inter_haz.pdf", 
+                              data_x = data_x_genadd_tdmain_inter,
+                              survival_fn = hazard_wrap_genadd_tdmain_inter,
+                              ylabel="Attribution $h(t|x)$",
+                              compare_plots="Diff",
+                              label_fontsize=16,
+                              tick_fontsize=14,
+                              figsize=(10,6),
+                              idx_plot=idx, 
+                              smooth=True,
+                              smooth_window=30,
+                              smooth_poly=1) 
+
+###### GROUND TRUTH LOG HAZARD
+# define the log hazard function
+def log_hazard_func_genadd_tdmain_inter(t, x1, x2, x3):
+    return np.log((0.03 * np.exp((0.4 * x1**2) * np.log(t+1) - (0.8 * (2/np.pi) * np.arctan(0.7 * x2)) - (0.6 * x3) - (0.5 * x1 * x2) + (0.2 * x1 * x3**2))))
+
+# explain
+# wrap the hazard function
+def log_hazard_wrap_genadd_tdmain_inter(X, t):
+    return survshapiq_func.hazard_matrix(X, log_hazard_func_genadd_tdmain_inter, t)
+
+# exact
+explanation_genadd_tdmain_inter_loghaz = survshapiq_func.survshapiq_ground_truth(data_x_genadd_tdmain_inter, 
+                                                            x_new_genadd_tdmain_inter, 
+                                                            log_hazard_wrap_genadd_tdmain_inter, 
+                                                            times=model_gbsa_genadd_tdmain_inter.unique_times_[::5], 
+                                                            budget=2**8, 
+                                                            max_order=2, 
+                                                            index= "k-SII",
+                                                            exact=True,
+                                                            feature_names = data_x_genadd_tdmain_inter_df.columns)
+
+survshapiq_func.plot_interact(explanations_all = explanation_genadd_tdmain_inter_loghaz, 
+                              model = None,
+                              times=model_gbsa_genadd_tdmain_inter.unique_times_[::5], 
+                              x_new = x_new_genadd_tdmain_inter, 
+                              save_path = f"{path_plots}/9_genadd_tdmain_inter/plot_gt_genadd_tdmain_inter_loghaz.pdf",
+                              data_x = data_x_genadd_tdmain_inter,
+                              survival_fn = log_hazard_wrap_genadd_tdmain_inter,
+                              compare_plots="Diff",
+                              ylabel="Attribution $\log(h(t|x))$",
+                              label_fontsize=16,
+                              tick_fontsize=14,
+                              figsize=(10,6),
+                              idx_plot=idx, 
+                              smooth=True,
+                              smooth_window=100,
+                              smooth_poly=1) 
+
+
+###### GROUND TRUTH SURVIVAL
+# explain
+# wrap the survival function
+def surv_from_hazard_genadd_tdmain_inter_wrap(X, t):
+    return survshapiq_func.survival_from_hazard(X, hazard_func_genadd_tdmain_inter, t)
+
+# exact
+explanation_genadd_tdmain_inter_surv = survshapiq_func.survshapiq_ground_truth(data_x_genadd_tdmain_inter, 
+                                                            x_new_genadd_tdmain_inter, 
+                                                            surv_from_hazard_genadd_tdmain_inter_wrap, 
+                                                            times=model_gbsa_genadd_tdmain_inter.unique_times_[::5], 
+                                                            budget=2**8, 
+                                                            max_order=2, 
+                                                            index= "k-SII",
+                                                            exact=True,
+                                                            feature_names = data_x_genadd_tdmain_inter_df.columns)
+
+survshapiq_func.plot_interact(explanations_all = explanation_genadd_tdmain_inter_surv, 
+                              model = None,
+                              times=model_gbsa_genadd_tdmain_inter.unique_times_[::5], 
+                              x_new = x_new_genadd_tdmain_inter, 
+                              save_path = f"{path_plots}/9_genadd_tdmain_inter/plot_gt_genadd_tdmain_inter_surv.pdf",
+                              data_x = data_x_genadd_tdmain_inter,
+                              survival_fn = surv_from_hazard_genadd_tdmain_inter_wrap,
+                              compare_plots="Diff",
+                              ylabel="Attribution $S(t|x)$",
+                              label_fontsize=16,
+                              tick_fontsize=14,
+                              figsize=(10,6),
+                              idx_plot=idx, 
+                              smooth=True,
+                              smooth_window=50,
+                              smooth_poly=1) 
+
+
+###### MODEL SURVIVAL
+# gbsa
+explanation_genadd_tdmain_inter_gbsa = survshapiq_func.survshapiq(model_gbsa_genadd_tdmain_inter, 
+                                                    X_train_genadd_tdmain_inter, 
+                                                    x_new_genadd_tdmain_inter, 
+                                                    time_stride=5, 
+                                                    budget=2**8, 
+                                                    max_order=2, 
+                                                    index= "k-SII",
+                                                    exact=True, 
+                                                    feature_names = data_x_genadd_tdmain_inter_df.columns)
+
+survshapiq_func.plot_interact(explanations_all = explanation_genadd_tdmain_inter_gbsa, 
+                              model = model_gbsa_genadd_tdmain_inter,
+                              x_new = x_new_genadd_tdmain_inter, 
+                              times = model_gbsa_genadd_tdmain_inter.unique_times_[::5],
+                              save_path = f"{path_plots}/9_genadd_tdmain_inter/plot_gbsa_genadd_tdmain_inter_surv.pdf",
+                              compare_plots = "Diff", 
+                              data_x = data_x_genadd_tdmain_inter,
+                              ylabel="Attribution $\hat{S}(t|x)$",
+                              label_fontsize=16,
+                              tick_fontsize=14,
+                              figsize=(10,6),
+                              idx_plot=idx,
+                              smooth=True,
+                              smooth_window=50,
+                              smooth_poly=1) 
+
+# coxph
+explanation_genadd_tdmain_inter_cox = survshapiq_func.survshapiq(model_cox_genadd_tdmain_inter, 
+                                                    X_train_genadd_tdmain_inter, 
+                                                    x_new_genadd_tdmain_inter, 
+                                                    time_stride=5, 
+                                                    budget=2**8, 
+                                                    max_order=2, 
+                                                    index= "k-SII",
+                                                    exact=True, 
+                                                    feature_names = data_x_genadd_tdmain_inter_df.columns)
+
+survshapiq_func.plot_interact(explanations_all = explanation_genadd_tdmain_inter_cox, 
+                              model = model_cox_genadd_tdmain_inter,
+                              x_new = x_new_genadd_tdmain_inter, 
+                              times = model_cox_genadd_tdmain_inter.unique_times_[::5],
+                              save_path = f"{path_plots}/9_genadd_tdmain_inter/plot_cox_genadd_tdmain_inter_surv.pdf",
+                              compare_plots = "Diff", 
+                              data_x = data_x_genadd_tdmain_inter,
+                              ylabel="Attribution $\hat{S}(t|x)$",
+                              label_fontsize=16,
+                              tick_fontsize=14,
+                              figsize=(10,6),
+                              idx_plot=idx,
+                              smooth=True,
+                              smooth_window=50,
+                              smooth_poly=1) 
+
+
+
+#---------------------------
+# 10) Generalized Additive G(t|x), TD Inter (interactions)
+#---------------------------
+
+# load simulated data DataFrame
+simdata_genadd_tdinter = pd.read_csv(f"{path_data}/10_simdata_genadd_tdinter.csv")
 print(simdata_genadd_tdinter.head())
 simdata_genadd_tdinter
 
-# Convert eventtime and status columns to a structured array
+# convert eventtime and status columns to a structured array
 data_y_genadd_tdinter, data_x_genadd_tdinter_df = survshapiq_func.prepare_survival_data(simdata_genadd_tdinter)
 print(data_y_genadd_tdinter)
 print(data_x_genadd_tdinter_df.head())
@@ -1243,35 +1912,36 @@ X_train_genadd_tdinter, X_test_genadd_tdinter, y_train_genadd_tdinter, y_test_ge
     stratify=None    
 )
 
-# Fit GradientBoostingSurvivalAnalysis
+# fit GradientBoostingSurvivalAnalysis
 model_gbsa_genadd_tdinter = GradientBoostingSurvivalAnalysis()
 model_gbsa_genadd_tdinter.fit(X_train_genadd_tdinter, y_train_genadd_tdinter)
 print(f'C-index (train): {model_gbsa_genadd_tdinter.score(X_test_genadd_tdinter, y_test_genadd_tdinter).item():0.3f}')
-ibs_gbsa_genadd_tdinter = survshapiq_func.compute_integrated_brier(y_test_genadd_tdinter, X_test_genadd_tdinter, model_gbsa_genadd_tdinter, min_time = 0.04, max_time = 69)
+ibs_gbsa_genadd_tdinter = survshapiq_func.compute_integrated_brier(y_test_genadd_tdinter, X_test_genadd_tdinter, model_gbsa_genadd_tdinter, min_time = 0.16, max_time = 69)
 print(f'Integrated Brier Score (train): {ibs_gbsa_genadd_tdinter:0.3f}')
 
-# Fit CoxPH
+# fit CoxPH
 model_cox_genadd_tdinter = CoxPHSurvivalAnalysis()
 model_cox_genadd_tdinter.fit(X_train_genadd_tdinter, y_train_genadd_tdinter)
 print(f'C-index (train): {model_cox_genadd_tdinter.score(X_test_genadd_tdinter, y_test_genadd_tdinter).item():0.3f}')
-ibs_cox_genadd_tdinter = survshapiq_func.compute_integrated_brier(y_test_genadd_tdinter, X_test_genadd_tdinter, model_cox_genadd_tdinter, min_time = 0.04, max_time = 69)
-print(f'Integrated Brier Score (train): {ibs_cox_genadd_tdinter:0.3f}')
+ibs_cox_linear_tdinter = survshapiq_func.compute_integrated_brier(y_test_genadd_tdinter, X_test_genadd_tdinter, model_cox_genadd_tdinter, min_time = 0.08, max_time = 69)
+print(f'Integrated Brier Score (train): {ibs_cox_linear_tdinter:0.3f}')
 
-# Create data point for explanation
-idx = 10 #1,8
+
+# create data point for explanation
+idx = 7
 x_new_genadd_tdinter = data_x_genadd_tdinter[[idx]]
-#x_new_td = data_x_td[1:9]
 print(x_new_genadd_tdinter)
 
 ###### GROUND TRUTH HAZARD
-# Define the hazard function
+# define the hazard function
 def hazard_func_genadd_tdinter(t, x1, x2, x3):
-    # baseline hazard * exp(lp)
-    return 0.01 * np.exp(0.2 * x1 - 0.3 * ((x1 ** 2) - 1) + 0.5 * ((2 / np.pi) * np.arctan(0.7 * x2)) - 0.4 * x3 + 0.2 * x1 * x2 - 0.4 * (x1 * x2 * np.log(t + 1)) + 0.3 * ((x1 ** 2 - 1) * x3))
+    return (0.03 * np.exp((0.4 * x1**2) - (0.8 * (2/np.pi) * np.arctan(0.7 * x2)) - (0.6 * x3) - (0.5 * x1 * x2) + (0.2 * x1 * x3**2 * np.log(t + 1))))
 
-# Wrap the hazard function
+# explain
+# wrap the hazard function
 def hazard_wrap_genadd_tdinter(X, t):
     return survshapiq_func.hazard_matrix(X, hazard_func_genadd_tdinter, t)
+
 # exact
 explanation_genadd_tdinter_haz = survshapiq_func.survshapiq_ground_truth(data_x_genadd_tdinter, 
                                                             x_new_genadd_tdinter, 
@@ -1279,6 +1949,7 @@ explanation_genadd_tdinter_haz = survshapiq_func.survshapiq_ground_truth(data_x_
                                                             times=model_gbsa_genadd_tdinter.unique_times_[::5], 
                                                             budget=2**8, 
                                                             max_order=2, 
+                                                            index= "k-SII",
                                                             exact=True,
                                                             feature_names = data_x_genadd_tdinter_df.columns)
 
@@ -1286,29 +1957,29 @@ survshapiq_func.plot_interact(explanations_all = explanation_genadd_tdinter_haz,
                               model = None,
                               times=model_gbsa_genadd_tdinter.unique_times_[::5], 
                               x_new = x_new_genadd_tdinter, 
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_gt_genadd_tdinter_haz.pdf",
+                              save_path = f"{path_plots}/10_genadd_tdinter/plot_gt_genadd_tdinter_haz.pdf", 
                               data_x = data_x_genadd_tdinter,
                               survival_fn = hazard_wrap_genadd_tdinter,
                               ylabel="Attribution $h(t|x)$",
+                              compare_plots="Diff",
                               label_fontsize=16,
                               tick_fontsize=14,
                               figsize=(10,6),
                               idx_plot=idx, 
-                              smooth=True, 
-                              smooth_window=150,
+                              smooth=True,
+                              smooth_window=20,
                               smooth_poly=1) 
 
-
-
 ###### GROUND TRUTH LOG HAZARD
-# Define the hazard function
+# define the log hazard function
 def log_hazard_func_genadd_tdinter(t, x1, x2, x3):
-    # baseline hazard * exp(lp)
-    return np.log(0.01 * np.exp(0.2 * x1 - 0.3 * ((x1 ** 2) - 1) + 0.5 * ((2 / np.pi) * np.arctan(0.7 * x2)) - 0.4 * x3 + 0.2 * x1 * x2 - 0.4 * (x1 * x2 * np.log(t + 1)) + 0.3 * ((x1 ** 2 - 1) * x3)))
+    return np.log((0.03 * np.exp((0.4 * x1**2) - (0.8 * (2/np.pi) * np.arctan(0.7 * x2)) - (0.6 * x3) - (0.5 * x1 * x2) + (0.2 * x1 * x3**2 * np.log(t+1)))))
 
-# Wrap the hazard function
+# explain
+# wrap the hazard function
 def log_hazard_wrap_genadd_tdinter(X, t):
     return survshapiq_func.hazard_matrix(X, log_hazard_func_genadd_tdinter, t)
+
 # exact
 explanation_genadd_tdinter_loghaz = survshapiq_func.survshapiq_ground_truth(data_x_genadd_tdinter, 
                                                             x_new_genadd_tdinter, 
@@ -1316,6 +1987,7 @@ explanation_genadd_tdinter_loghaz = survshapiq_func.survshapiq_ground_truth(data
                                                             times=model_gbsa_genadd_tdinter.unique_times_[::5], 
                                                             budget=2**8, 
                                                             max_order=2, 
+                                                            index= "k-SII",
                                                             exact=True,
                                                             feature_names = data_x_genadd_tdinter_df.columns)
 
@@ -1323,23 +1995,26 @@ survshapiq_func.plot_interact(explanations_all = explanation_genadd_tdinter_logh
                               model = None,
                               times=model_gbsa_genadd_tdinter.unique_times_[::5], 
                               x_new = x_new_genadd_tdinter, 
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_gt_genadd_tdinter_loghaz.pdf",
+                              save_path = f"{path_plots}/10_genadd_tdinter/plot_gt_genadd_tdinter_loghaz.pdf",
                               data_x = data_x_genadd_tdinter,
                               survival_fn = log_hazard_wrap_genadd_tdinter,
+                              compare_plots="Diff",
                               ylabel="Attribution $\log(h(t|x))$",
                               label_fontsize=16,
                               tick_fontsize=14,
                               figsize=(10,6),
                               idx_plot=idx, 
-                              smooth=True, 
+                              smooth=True,
                               smooth_window=100,
                               smooth_poly=1) 
 
 
 ###### GROUND TRUTH SURVIVAL
-# Wrap the survival function
+# explain
+# wrap the survival function
 def surv_from_hazard_genadd_tdinter_wrap(X, t):
     return survshapiq_func.survival_from_hazard(X, hazard_func_genadd_tdinter, t)
+
 # exact
 explanation_genadd_tdinter_surv = survshapiq_func.survshapiq_ground_truth(data_x_genadd_tdinter, 
                                                             x_new_genadd_tdinter, 
@@ -1347,15 +2022,18 @@ explanation_genadd_tdinter_surv = survshapiq_func.survshapiq_ground_truth(data_x
                                                             times=model_gbsa_genadd_tdinter.unique_times_[::5], 
                                                             budget=2**8, 
                                                             max_order=2, 
+                                                            index= "k-SII",
                                                             exact=True,
                                                             feature_names = data_x_genadd_tdinter_df.columns)
+
 survshapiq_func.plot_interact(explanations_all = explanation_genadd_tdinter_surv, 
                               model = None,
                               times=model_gbsa_genadd_tdinter.unique_times_[::5], 
                               x_new = x_new_genadd_tdinter, 
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_gt_genadd_tdinter_surv.pdf",
+                              save_path = f"{path_plots}/10_genadd_tdinter/plot_gt_genadd_tdinter_surv.pdf",
                               data_x = data_x_genadd_tdinter,
                               survival_fn = surv_from_hazard_genadd_tdinter_wrap,
+                              compare_plots="Diff",
                               ylabel="Attribution $S(t|x)$",
                               label_fontsize=16,
                               tick_fontsize=14,
@@ -1365,6 +2043,7 @@ survshapiq_func.plot_interact(explanations_all = explanation_genadd_tdinter_surv
                               smooth_window=50,
                               smooth_poly=1) 
 
+
 ###### MODEL SURVIVAL
 # gbsa
 explanation_genadd_tdinter_gbsa = survshapiq_func.survshapiq(model_gbsa_genadd_tdinter, 
@@ -1373,15 +2052,16 @@ explanation_genadd_tdinter_gbsa = survshapiq_func.survshapiq(model_gbsa_genadd_t
                                                     time_stride=5, 
                                                     budget=2**8, 
                                                     max_order=2, 
+                                                    index= "k-SII",
                                                     exact=True, 
                                                     feature_names = data_x_genadd_tdinter_df.columns)
 
 survshapiq_func.plot_interact(explanations_all = explanation_genadd_tdinter_gbsa, 
                               model = model_gbsa_genadd_tdinter,
                               x_new = x_new_genadd_tdinter, 
-                              times=model_gbsa_genadd_tdinter.unique_times_[::5],
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_gbsa_genadd_tdinter_surv.pdf",
-                              compare_plots = True, 
+                              times = model_gbsa_genadd_tdinter.unique_times_[::5],
+                              save_path = f"{path_plots}/10_genadd_tdinter/plot_gbsa_genadd_tdinter_surv.pdf",
+                              compare_plots = "Diff", 
                               data_x = data_x_genadd_tdinter,
                               ylabel="Attribution $\hat{S}(t|x)$",
                               label_fontsize=16,
@@ -1399,6 +2079,7 @@ explanation_genadd_tdinter_cox = survshapiq_func.survshapiq(model_cox_genadd_tdi
                                                     time_stride=5, 
                                                     budget=2**8, 
                                                     max_order=2, 
+                                                    index= "k-SII",
                                                     exact=True, 
                                                     feature_names = data_x_genadd_tdinter_df.columns)
 
@@ -1406,8 +2087,8 @@ survshapiq_func.plot_interact(explanations_all = explanation_genadd_tdinter_cox,
                               model = model_cox_genadd_tdinter,
                               x_new = x_new_genadd_tdinter, 
                               times = model_cox_genadd_tdinter.unique_times_[::5],
-                              save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory/plot_cox_genadd_tdinter_surv.pdf",
-                              compare_plots = True, 
+                              save_path = f"{path_plots}/10_genadd_tdinter/plot_cox_genadd_tdinter_surv.pdf",
+                              compare_plots = "Diff", 
                               data_x = data_x_genadd_tdinter,
                               ylabel="Attribution $\hat{S}(t|x)$",
                               label_fontsize=16,
@@ -1418,51 +2099,55 @@ survshapiq_func.plot_interact(explanations_all = explanation_genadd_tdinter_cox,
                               smooth_window=50,
                               smooth_poly=1) 
 
-#########################
-t = 0
-explanations_all = explanation_genadd_tdinter_cox
-explanations_all[0]
-row_sums = np.array(explanations_all[0].sum(axis=1))
-row_sums
-model = model_cox_genadd_tdinter
-times = model.unique_times_[::5]
-surv_funcs = model.predict_survival_function(data_x_genadd_tdinter)
-surv_matrix = np.vstack([sf(times) for sf in surv_funcs]
-surv_matrix.shape
-idx_plot = 10
-surv_matrix_id = surv_matrix[, t]
-surv_matrix_id.shape
-np.mean(surv_matrix_id - row_sums, axis=0)
-surv_matrix_id - row_sums
-
-
-mean_surv = np.sqrt(np.mean((surv_matrix_id - row_sums), axis=0)**2/np.mean((surv_matrix_id)**2, axis=0))
-mean_surv
-
-
 
 ####### COMBINED PLOTS
 #################################################################################################
-############## TIME-INDEPENDENCE HAZARD
+############## HAZARD
 # Create figure
-fig, axes = plt.subplots(3, 1, figsize=(8, 12), sharex=True)
+fig, axes = plt.subplots(5, 2, figsize=(14, 18), sharex=True)
+axes = axes.flatten()  
 
-# Initialize lists to collect all handles and labels
 handles_all, labels_all = [], []
 
-# Plot each subplot and collect handles/labels
-for ax, expl, times, data_x, surv_fn, title in zip(
+for ax, smooth_w, expl, times, data_x, surv_fn, title in zip(
     axes,
+    [100, 30, 100, 30, 15, 100, 25, 120, 25, 5],
     [explanation_linear_ti_haz[0],
-     explanation_add_ti_haz[0],
-     explanation_genadd_ti_haz[0]],
+     explanation_linear_tdmain_haz[0],
+     explanation_linear_ti_inter_haz[0],
+     explanation_linear_tdmain_inter_haz[0],
+     explanation_linear_tdinter_haz[0],
+     explanation_genadd_ti_haz[0],
+     explanation_genadd_tdmain_haz[0],
+     explanation_genadd_ti_inter_haz[0],
+     explanation_genadd_tdmain_inter_haz[0],
+     explanation_genadd_tdinter_haz[0]],
     [model_gbsa_linear_ti.unique_times_[::5],
-     model_gbsa_add_ti.unique_times_[::5],
-     model_gbsa_genadd_ti.unique_times_[::5]],
-    [data_x_linear_ti, data_x_add_ti, data_x_genadd_ti],
-    [hazard_wrap_linear_ti, hazard_wrap_add_ti, hazard_wrap_genadd_ti],
-    ["GT: Linear RF", "GT: Additive RF", "GT: General Additive RF"]
-    
+     model_gbsa_linear_tdmain.unique_times_[::5],
+     model_gbsa_linear_ti_inter.unique_times_[::5],
+     model_gbsa_linear_tdmain_inter.unique_times_[::5],
+     model_gbsa_linear_tdinter.unique_times_[::5],
+     model_gbsa_genadd_ti.unique_times_[::5],
+     model_gbsa_genadd_tdmain.unique_times_[::5],
+     model_gbsa_genadd_ti_inter.unique_times_[::5],
+     model_gbsa_genadd_tdmain_inter.unique_times_[::5],
+     model_gbsa_genadd_tdinter.unique_times_[::5]],
+    [data_x_linear_ti, data_x_linear_tdmain, data_x_linear_ti_inter,
+     data_x_linear_tdmain_inter, data_x_linear_tdinter,
+     data_x_genadd_ti, data_x_genadd_tdmain, data_x_genadd_ti_inter,
+     data_x_genadd_tdmain_inter, data_x_genadd_tdinter],
+    [hazard_wrap_linear_ti, hazard_wrap_linear_tdmain,
+     hazard_wrap_linear_ti_inter, hazard_wrap_linear_tdmain_inter,
+     hazard_wrap_linear_tdinter, hazard_wrap_genadd_ti,
+     hazard_wrap_genadd_tdmain, hazard_wrap_genadd_ti_inter,
+     hazard_wrap_genadd_tdmain_inter, hazard_wrap_genadd_tdinter],
+    ["(1) GT: Linear G(t|x) TI", "(2) GT: Linear G(t|x) TD Main",
+     "(3) GT: Linear G(t|x) TI Inter", "(4) GT: Linear G(t|x) TD Main Inter",
+     "(5) GT: Linear G(t|x) TD Inter", "(6) GT: General Additive G(t|x) TI",
+     "(7) GT: General Additive G(t|x) TD Main",
+     "(8) GT: General Additive G(t|x) TI Inter",
+     "(9) GT: General Additive G(t|x) TD Main Inter",
+     "(10) GT: General Additive G(t|x) TD Inter"]
 ):
     h, l = survshapiq_func.plot_interact_ax(
         ax=ax,
@@ -1470,17 +2155,19 @@ for ax, expl, times, data_x, surv_fn, title in zip(
         times=times,
         data_x=data_x,
         survival_fn=surv_fn,
+        compare_plots="Diff",
         idx_plot=idx,
         ylabel="Attribution $h(t|x)$",
         label_fontsize=16,
         tick_fontsize=14,
         smooth=True,
-        smooth_window=100,
+        smooth_window=smooth_w,
         smooth_poly=1,
-        title=title
+        title=title,
     )
     handles_all.extend(h)
     labels_all.extend(l)
+
 
 # Remove duplicates
 unique = dict(zip(labels_all, handles_all))
@@ -1495,31 +2182,58 @@ fig.legend(
 )
 
 # Adjust layout to leave space for legend
-plt.tight_layout(rect=[0, 0.08, 1, 1])
+plt.tight_layout(rect=[0, 0.04, 1, 1])
 
 # Save the figure
-save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_combined/plot_ti_haz.pdf"
+save_path = f"{path_plots_combined}/plot_haz.pdf"
 fig.savefig(save_path, bbox_inches="tight")
 
-################### TIME-INDEPENDENCE LOG HAZARD
-# Create figure
-fig, axes = plt.subplots(3, 1, figsize=(8, 12), sharex=True)
 
-# Initialize lists to collect all handles and labels
+############## LOG HAZARD
+# Create figure
+fig, axes = plt.subplots(5, 2, figsize=(14, 18), sharex=True)
+axes = axes.flatten()  
+
 handles_all, labels_all = [], []
 
-# Plot each subplot and collect handles/labels
 for ax, expl, times, data_x, surv_fn, title in zip(
     axes,
     [explanation_linear_ti_loghaz[0],
-     explanation_add_ti_loghaz[0],
-     explanation_genadd_ti_loghaz[0]],
+     explanation_linear_tdmain_loghaz[0],
+     explanation_linear_ti_inter_loghaz[0],
+     explanation_linear_tdmain_inter_loghaz[0],
+     explanation_linear_tdinter_loghaz[0],
+     explanation_genadd_ti_loghaz[0],
+     explanation_genadd_tdmain_loghaz[0],
+     explanation_genadd_ti_inter_loghaz[0],
+     explanation_genadd_tdmain_inter_loghaz[0],
+     explanation_genadd_tdinter_loghaz[0]],
     [model_gbsa_linear_ti.unique_times_[::5],
-     model_gbsa_add_ti.unique_times_[::5],
-     model_gbsa_genadd_ti.unique_times_[::5]],
-    [data_x_linear_ti, data_x_add_ti, data_x_genadd_ti],
-    [log_hazard_wrap_linear_ti, log_hazard_wrap_add_ti, log_hazard_wrap_genadd_ti],
-    ["GT: Linear RF", "GT: Additive RF", "GT: General Additive RF"]
+     model_gbsa_linear_tdmain.unique_times_[::5],
+     model_gbsa_linear_ti_inter.unique_times_[::5],
+     model_gbsa_linear_tdmain_inter.unique_times_[::5],
+     model_gbsa_linear_tdinter.unique_times_[::5],
+     model_gbsa_genadd_ti.unique_times_[::5],
+     model_gbsa_genadd_tdmain.unique_times_[::5],
+     model_gbsa_genadd_ti_inter.unique_times_[::5],
+     model_gbsa_genadd_tdmain_inter.unique_times_[::5],
+     model_gbsa_genadd_tdinter.unique_times_[::5]],
+    [data_x_linear_ti, data_x_linear_tdmain, data_x_linear_ti_inter,
+     data_x_linear_tdmain_inter, data_x_linear_tdinter,
+     data_x_genadd_ti, data_x_genadd_tdmain, data_x_genadd_ti_inter,
+     data_x_genadd_tdmain_inter, data_x_genadd_tdinter],
+    [log_hazard_wrap_linear_ti, log_hazard_wrap_linear_tdmain,
+     log_hazard_wrap_linear_ti_inter, log_hazard_wrap_linear_tdmain_inter,
+     log_hazard_wrap_linear_tdinter, log_hazard_wrap_genadd_ti,
+     log_hazard_wrap_genadd_tdmain, log_hazard_wrap_genadd_ti_inter,
+     log_hazard_wrap_genadd_tdmain_inter, log_hazard_wrap_genadd_tdinter],
+    ["(1) GT: Linear G(t|x) TI", "(2) GT: Linear G(t|x) TD Main",
+     "(3) GT: Linear G(t|x) TI Inter", "(4) GT: Linear G(t|x) TD Main Inter",
+     "(5) GT: Linear G(t|x) TD Inter", "(6) GT: General Additive G(t|x) TI",
+     "(7) GT: General Additive G(t|x) TD Main",
+     "(8) GT: General Additive G(t|x) TI Inter",
+     "(9) GT: General Additive G(t|x) TD Main Inter",
+     "(10) GT: General Additive G(t|x) TD Inter"]
 ):
     h, l = survshapiq_func.plot_interact_ax(
         ax=ax,
@@ -1527,6 +2241,7 @@ for ax, expl, times, data_x, surv_fn, title in zip(
         times=times,
         data_x=data_x,
         survival_fn=surv_fn,
+        compare_plots="Diff",
         idx_plot=idx,
         ylabel="Attribution $\log(h(t|x))$",
         label_fontsize=16,
@@ -1534,10 +2249,11 @@ for ax, expl, times, data_x, surv_fn, title in zip(
         smooth=True,
         smooth_window=100,
         smooth_poly=1,
-        title=title
+        title=title,
     )
     handles_all.extend(h)
     labels_all.extend(l)
+
 
 # Remove duplicates
 unique = dict(zip(labels_all, handles_all))
@@ -1552,323 +2268,57 @@ fig.legend(
 )
 
 # Adjust layout to leave space for legend
-plt.tight_layout(rect=[0, 0.08, 1, 1])
+plt.tight_layout(rect=[0, 0.04, 1, 1])
 
 # Save the figure
-save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_combined/plot_ti_loghaz.pdf"
+save_path = f"{path_plots_combined}/plot_loghaz.pdf"
 fig.savefig(save_path, bbox_inches="tight")
 
-################### TIME-INDEPENDENCE SURVIVAL
+############## SURVIVAL
 # Create figure
-fig, axes = plt.subplots(3, 1, figsize=(8, 12), sharex=True)
+fig, axes = plt.subplots(5, 2, figsize=(14, 18), sharex=True)
+axes = axes.flatten()  
 
-# Initialize lists to collect all handles and labels
 handles_all, labels_all = [], []
 
-# Plot each subplot and collect handles/labels
 for ax, expl, times, data_x, surv_fn, title in zip(
     axes,
     [explanation_linear_ti_surv[0],
-     explanation_add_ti_surv[0],
-     explanation_genadd_ti_surv[0]],
-    [model_gbsa_linear_ti.unique_times_[::5],
-     model_gbsa_add_ti.unique_times_[::5],
-     model_gbsa_genadd_ti.unique_times_[::5]],
-    [data_x_linear_ti, data_x_add_ti, data_x_genadd_ti],
-    [surv_from_hazard_linear_ti_wrap, surv_from_hazard_add_ti_wrap, surv_from_hazard_genadd_ti_wrap],
-    ["GT: Linear RF", "GT: Additive RF", "GT: General Additive RF"]
-):
-    h, l = survshapiq_func.plot_interact_ax(
-        ax=ax,
-        explanations_all=expl,
-        times=times,
-        data_x=data_x,
-        survival_fn=surv_fn,
-        idx_plot=idx,
-        ylabel="Attribution $S(t|x)$",
-        label_fontsize=16,
-        tick_fontsize=14,
-        smooth=True,
-        smooth_window=50,
-        smooth_poly=1,
-        title=title
-    )
-    handles_all.extend(h)
-    labels_all.extend(l)
-
-# Remove duplicates
-unique = dict(zip(labels_all, handles_all))
-
-# One shared legend at the bottom
-fig.legend(
-    unique.values(),
-    unique.keys(),
-    loc="lower center",
-    ncol=4,
-    fontsize=14
-)
-
-# Adjust layout to leave space for legend
-plt.tight_layout(rect=[0, 0.08, 1, 1])
-
-# Save the figure
-save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_combined/plot_ti_surv.pdf"
-fig.savefig(save_path, bbox_inches="tight")
-
-################### TIME-INDEPENDENCE GBSA
-# Create figure
-fig, axes = plt.subplots(3, 1, figsize=(8, 12), sharex=True)
-
-# Initialize lists to collect all handles and labels
-handles_all, labels_all = [], []
-
-# Plot each subplot and collect handles/labels
-for ax, expl, times, data_x, model, title in zip(
-    axes,
-    [explanation_gbsa_linear_ti[0],
-     explanation_add_ti_gbsa[0],
-     explanation_genadd_ti_gbsa[0]],
-    [model_gbsa_linear_ti.unique_times_[::5],
-     model_gbsa_add_ti.unique_times_[::5],
-     model_gbsa_genadd_ti.unique_times_[::5]],
-    [data_x_linear_ti, data_x_add_ti, data_x_genadd_ti],
-    [model_gbsa_linear_ti, model_gbsa_add_ti, model_gbsa_genadd_ti],
-    ["GBSA: Linear RF", "GBSA: Additive RF", "GBSA: General Additive RF"]
-):
-    h, l = survshapiq_func.plot_interact_ax(
-        ax=ax,
-        explanations_all=expl,
-        times=times,
-        data_x=data_x,
-        model=model,
-        idx_plot=idx,
-        ylabel="Attribution $\hat{S}(t|x)$",
-        label_fontsize=16,
-        tick_fontsize=14,
-        smooth=True,
-        smooth_window=50,
-        smooth_poly=1,
-        title=title
-    )
-    handles_all.extend(h)
-    labels_all.extend(l)
-
-# Remove duplicates
-unique = dict(zip(labels_all, handles_all))
-
-# One shared legend at the bottom
-fig.legend(
-    unique.values(),
-    unique.keys(),
-    loc="lower center",
-    ncol=4,
-    fontsize=14
-)
-
-# Adjust layout to leave space for legend
-plt.tight_layout(rect=[0, 0.08, 1, 1])
-
-# Save the figure
-save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_combined/plot_ti_gbsa.pdf"
-fig.savefig(save_path, bbox_inches="tight")
-
-################### TIME-INDEPENDENCE COXPH
-# Create figure
-fig, axes = plt.subplots(3, 1, figsize=(8, 12), sharex=True)
-
-# Initialize lists to collect all handles and labels
-handles_all, labels_all = [], []
-
-# Plot each subplot and collect handles/labels
-for ax, expl, times, data_x, model, title in zip(
-    axes,
-    [explanation_cox_linear_ti[0],
-     explanation_add_ti_cox[0],
-     explanation_cox_genadd_ti[0]],
-    [model_cox_linear_ti.unique_times_[::5],
-     model_cox_add_ti.unique_times_[::5],
-     model_cox_genadd_ti.unique_times_[::5]],
-    [data_x_linear_ti, data_x_add_ti, data_x_genadd_ti],
-    [model_cox_linear_ti, model_cox_add_ti, model_cox_genadd_ti],
-    ["CoxPH: Linear RF", "CoxPH: Additive RF", "CoxPH: General Additive RF"]
-):
-    h, l = survshapiq_func.plot_interact_ax(
-        ax=ax,
-        explanations_all=expl,
-        times=times,
-        data_x=data_x,
-        model=model,
-        idx_plot=idx,
-        ylabel="Attribution $\hat{S}(t|x)$",
-        label_fontsize=16,
-        tick_fontsize=14,
-        smooth=True,
-        smooth_window=50,
-        smooth_poly=1,
-        title=title
-    )
-    handles_all.extend(h)
-    labels_all.extend(l)
-
-# Remove duplicates
-unique = dict(zip(labels_all, handles_all))
-
-# One shared legend at the bottom
-fig.legend(
-    unique.values(),
-    unique.keys(),
-    loc="lower center",
-    ncol=4,
-    fontsize=14
-)
-
-# Adjust layout to leave space for legend
-plt.tight_layout(rect=[0, 0.08, 1, 1])
-
-# Save the figure
-save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_combined/plot_ti_cox.pdf"
-fig.savefig(save_path, bbox_inches="tight")
-
-
-############## TIME-DEPENDENCE HAZARD
-# Create figure
-fig, axes = plt.subplots(4, 1, figsize=(8, 16), sharex=True)
-
-# Initialize lists to collect all handles and labels
-handles_all, labels_all = [], []
-
-# Plot each subplot and collect handles/labels
-for ax, expl, times, data_x, surv_fn, title in zip(
-    axes,
-    [explanation_linear_tdmain_haz[0],
-     explanation_linear_tdinter_haz[0],
-     explanation_genadd_tdmain_haz[0],
-     explanation_genadd_tdinter_haz[0]],
-    [model_gbsa_linear_tdmain.unique_times_[::5],
-     model_gbsa_linear_tdinter.unique_times_[::5],
-     model_gbsa_genadd_tdmain.unique_times_[::5],
-     model_gbsa_genadd_tdinter.unique_times_[::5]],
-    [data_x_linear_tdmain, data_x_linear_tdinter, data_x_genadd_tdmain, data_x_genadd_tdinter],
-    [hazard_wrap_linear_tdmain, hazard_wrap_linear_tdinter, hazard_wrap_genadd_tdmain, hazard_wrap_genadd_tdinter],
-    ["GT: Linear RF TD Main Effect", "GT: Linear RF TD Interaction", "General Additive RF TD Main Effect", "General Additive RF TD Interaction"]
-):
-    h, l = survshapiq_func.plot_interact_ax(
-        ax=ax,
-        explanations_all=expl,
-        times=times,
-        data_x=data_x,
-        survival_fn=surv_fn,
-        idx_plot=idx,
-        ylabel="Attribution $h(t|x)$",
-        label_fontsize=16,
-        tick_fontsize=14,
-        smooth=True,
-        smooth_window=100,
-        smooth_poly=1,
-        title=title
-    )
-    handles_all.extend(h)
-    labels_all.extend(l)
-
-# Remove duplicates
-unique = dict(zip(labels_all, handles_all))
-
-# One shared legend at the bottom
-fig.legend(
-    unique.values(),
-    unique.keys(),
-    loc="lower center",
-    ncol=4,
-    fontsize=14
-)
-
-# Adjust layout to leave space for legend
-plt.tight_layout(rect=[0, 0.08, 1, 1])
-
-# Save the figure
-save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_combined/plot_td_haz.pdf"
-fig.savefig(save_path, bbox_inches="tight")
-
-############## TIME-DEPENDENCE LOG HAZARD
-# Create figure
-fig, axes = plt.subplots(4, 1, figsize=(8, 16), sharex=True)
-
-# Initialize lists to collect all handles and labels
-handles_all, labels_all = [], []
-
-# Plot each subplot and collect handles/labels
-for ax, expl, times, data_x, surv_fn, title in zip(
-    axes,
-    [explanation_linear_tdmain_loghaz[0],
-     explanation_linear_tdinter_loghaz[0],
-     explanation_genadd_tdmain_loghaz[0],
-     explanation_genadd_tdinter_loghaz[0]],
-    [model_gbsa_linear_tdmain.unique_times_[::5],
-     model_gbsa_linear_tdinter.unique_times_[::5],
-     model_gbsa_genadd_tdmain.unique_times_[::5],
-     model_gbsa_genadd_tdinter.unique_times_[::5]],
-    [data_x_linear_tdmain, data_x_linear_tdinter, data_x_genadd_tdmain, data_x_genadd_tdinter],
-    [log_hazard_wrap_linear_tdmain, log_hazard_wrap_linear_tdinter, log_hazard_wrap_genadd_tdmain, log_hazard_wrap_genadd_tdinter],
-    ["GT: Linear RF TD Main Effect", "GT: Linear RF TD Interaction", "GT: General Additive RF TD Main Effect", "GT: General Additive RF TD Interaction"]
-):
-    h, l = survshapiq_func.plot_interact_ax(
-        ax=ax,
-        explanations_all=expl,
-        times=times,
-        data_x=data_x,
-        survival_fn=surv_fn,
-        idx_plot=idx,
-        ylabel="Attribution $\log(h(t|x))$",
-        label_fontsize=16,
-        tick_fontsize=14,
-        smooth=True,
-        smooth_window=100,
-        smooth_poly=1,
-        title=title
-    )
-    handles_all.extend(h)
-    labels_all.extend(l)
-
-# Remove duplicates
-unique = dict(zip(labels_all, handles_all))
-
-# One shared legend at the bottom
-fig.legend(
-    unique.values(),
-    unique.keys(),
-    loc="lower center",
-    ncol=4,
-    fontsize=14
-)
-
-# Adjust layout to leave space for legend
-plt.tight_layout(rect=[0, 0.08, 1, 1])
-
-# Save the figure
-save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_combined/plot_td_loghaz.pdf"
-fig.savefig(save_path, bbox_inches="tight")
-
-############## TIME-DEPENDENCE SURVIVAL
-# Create figure
-fig, axes = plt.subplots(4, 1, figsize=(8, 16), sharex=True)
-
-# Initialize lists to collect all handles and labels
-handles_all, labels_all = [], []
-
-# Plot each subplot and collect handles/labels
-for ax, expl, times, data_x, surv_fn, title in zip(
-    axes,
-    [explanation_linear_tdmain_surv[0],
+     explanation_linear_tdmain_surv[0],
+     explanation_linear_ti_inter_surv[0],
+     explanation_linear_tdmain_inter_surv[0],
      explanation_linear_tdinter_surv[0],
+     explanation_genadd_ti_surv[0],
      explanation_genadd_tdmain_surv[0],
+     explanation_genadd_ti_inter_surv[0],
+     explanation_genadd_tdmain_inter_surv[0],
      explanation_genadd_tdinter_surv[0]],
-    [model_gbsa_linear_tdmain.unique_times_[::5],
+    [model_gbsa_linear_ti.unique_times_[::5],
+     model_gbsa_linear_tdmain.unique_times_[::5],
+     model_gbsa_linear_ti_inter.unique_times_[::5],
+     model_gbsa_linear_tdmain_inter.unique_times_[::5],
      model_gbsa_linear_tdinter.unique_times_[::5],
+     model_gbsa_genadd_ti.unique_times_[::5],
      model_gbsa_genadd_tdmain.unique_times_[::5],
+     model_gbsa_genadd_ti_inter.unique_times_[::5],
+     model_gbsa_genadd_tdmain_inter.unique_times_[::5],
      model_gbsa_genadd_tdinter.unique_times_[::5]],
-    [data_x_linear_tdmain, data_x_linear_tdinter, data_x_genadd_tdmain, data_x_genadd_tdinter],
-    [surv_from_hazard_linear_tdmain_wrap, surv_from_hazard_linear_tdinter_wrap, surv_from_hazard_genadd_tdmain_wrap, surv_from_hazard_genadd_tdinter_wrap],
-    ["GT: Linear RF TD Main Effect", "GT: Linear RF TD Interaction", "GT: General Additive RF TD Main Effect", "GT: General Additive RF TD Interaction"]
+    [data_x_linear_ti, data_x_linear_tdmain, data_x_linear_ti_inter,
+     data_x_linear_tdmain_inter, data_x_linear_tdinter,
+     data_x_genadd_ti, data_x_genadd_tdmain, data_x_genadd_ti_inter,
+     data_x_genadd_tdmain_inter, data_x_genadd_tdinter],
+    [surv_from_hazard_linear_ti_wrap, surv_from_hazard_linear_tdmain_wrap,
+     surv_from_hazard_linear_ti_inter_wrap, surv_from_hazard_linear_tdmain_inter_wrap,
+     surv_from_hazard_linear_tdinter_wrap, surv_from_hazard_genadd_ti_wrap,
+     surv_from_hazard_genadd_tdmain_wrap, surv_from_hazard_genadd_ti_inter_wrap,
+     surv_from_hazard_genadd_tdmain_inter_wrap, surv_from_hazard_genadd_tdinter_wrap],
+    ["(1) GT: Linear G(t|x) TI", "(2) GT: Linear G(t|x) TD Main",
+     "(3) GT: Linear G(t|x) TI Inter", "(4) GT: Linear G(t|x) TD Main Inter",
+     "(5) GT: Linear G(t|x) TD Inter", "(6) GT: General Additive G(t|x) TI",
+     "(7) GT: General Additive G(t|x) TD Main",
+     "(8) GT: General Additive G(t|x) TI Inter",
+     "(9) GT: General Additive G(t|x) TD Main Inter",
+     "(10) GT: General Additive G(t|x) TD Inter"]
 ):
     h, l = survshapiq_func.plot_interact_ax(
         ax=ax,
@@ -1876,17 +2326,19 @@ for ax, expl, times, data_x, surv_fn, title in zip(
         times=times,
         data_x=data_x,
         survival_fn=surv_fn,
+        compare_plots="Diff",
         idx_plot=idx,
         ylabel="Attribution $S(t|x)$",
         label_fontsize=16,
         tick_fontsize=14,
         smooth=True,
-        smooth_window=100,
+        smooth_window=50,
         smooth_poly=1,
-        title=title
+        title=title,
     )
     handles_all.extend(h)
     labels_all.extend(l)
+
 
 # Remove duplicates
 unique = dict(zip(labels_all, handles_all))
@@ -1901,153 +2353,221 @@ fig.legend(
 )
 
 # Adjust layout to leave space for legend
-plt.tight_layout(rect=[0, 0.08, 1, 1])
+plt.tight_layout(rect=[0, 0.04, 1, 1])
 
 # Save the figure
-save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_combined/plot_td_surv.pdf"
+save_path = f"{path_plots_combined}/plot_surv.pdf"
 fig.savefig(save_path, bbox_inches="tight")
 
-################### TIME-DEPENDENCE GBSA
+############## GBSA SURVIVAL
 # Create figure
-fig, axes = plt.subplots(4, 1, figsize=(8, 16), sharex=True)
+fig, axes = plt.subplots(5, 2, figsize=(14, 18), sharex=True)
+axes = axes.flatten()  
 
-# Initialize lists to collect all handles and labels
 handles_all, labels_all = [], []
 
-# Plot each subplot and collect handles/labels
-for ax, expl, times, data_x, model, title in zip(
+for ax, expl, model, times, data_x, title in zip(
     axes,
-    [explanation_linear_tdmain_gbsa[0],
+    [explanation_linear_ti_gbsa[0],
+     explanation_linear_tdmain_gbsa[0],
+     explanation_linear_ti_inter_gbsa[0],
+     explanation_linear_tdmain_inter_gbsa[0],
      explanation_linear_tdinter_gbsa[0],
+     explanation_genadd_ti_gbsa[0],
      explanation_genadd_tdmain_gbsa[0],
+     explanation_genadd_ti_inter_gbsa[0],
+     explanation_genadd_tdmain_inter_gbsa[0],
      explanation_genadd_tdinter_gbsa[0]],
-    [model_gbsa_linear_tdmain.unique_times_[::5],
-     model_gbsa_linear_tdinter.unique_times_[::5],
-     model_gbsa_genadd_tdmain.unique_times_[::5],
-     model_gbsa_genadd_tdinter.unique_times_[::5]],
-    [data_x_linear_tdmain, data_x_linear_tdinter, data_x_genadd_tdmain, data_x_genadd_tdinter],
-    [model_gbsa_linear_tdmain, model_gbsa_linear_tdinter, model_gbsa_genadd_tdmain, model_gbsa_genadd_tdinter],
-    ["GBSA: Linear RF TD Main Effect", "GBSA: Linear RF TD Interaction", "GBSA: General Additive RF TD Main Effect", "GBSA: General Additive RF TD Interaction"]
-):
-    h, l = survshapiq_func.plot_interact_ax(
-        ax=ax,
-        explanations_all=expl,
-        times=times,
-        data_x=data_x,
-        model=model,
-        idx_plot=idx,
-        ylabel="Attribution $\hat{S}(t|x)$",
-        label_fontsize=16,
-        tick_fontsize=14,
-        smooth=True,
-        smooth_window=50,
-        smooth_poly=1,
-        title=title
-    )
-    handles_all.extend(h)
-    labels_all.extend(l)
-
-# Remove duplicates
-unique = dict(zip(labels_all, handles_all))
-
-# One shared legend at the bottom
-fig.legend(
-    unique.values(),
-    unique.keys(),
-    loc="lower center",
-    ncol=4,
-    fontsize=14
-)
-
-# Adjust layout to leave space for legend
-plt.tight_layout(rect=[0, 0.08, 1, 1])
-
-# Save the figure
-save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_combined/plot_td_gbsa.pdf"
-fig.savefig(save_path, bbox_inches="tight")
-
-################### TIME-DEPENDENCE COXPH
-# Create figure
-fig, axes = plt.subplots(4, 1, figsize=(8, 16), sharex=True)
-
-# Initialize lists to collect all handles and labels
-handles_all, labels_all = [], []
-
-# Plot each subplot and collect handles/labels
-for ax, expl, times, data_x, model, title in zip(
-    axes,
-    [explanation_linear_tdmain_cox[0],
-     explanation_linear_tdinter_cox[0],
-     explanation_genadd_tdmain_cox[0],
-     explanation_genadd_tdinter_cox[0]],
-    [model_cox_linear_tdmain.unique_times_[::5],
-     model_cox_linear_tdinter.unique_times_[::5],
-     model_cox_genadd_tdmain.unique_times_[::5],
-     model_cox_genadd_tdinter.unique_times_[::5]],
-    [data_x_linear_tdmain, data_x_linear_tdinter, data_x_genadd_tdmain, data_x_genadd_tdinter],
-    [model_cox_linear_tdmain, model_cox_linear_tdinter, model_cox_genadd_tdmain, model_cox_genadd_tdinter],
-    ["CoxPH: Linear RF TD Main Effect", "CoxPH: Linear RF TD Interaction", "CoxPH: General Additive RF TD Main Effect", "CoxPH: General Additive RF TD Interaction"]
-):
-    h, l = survshapiq_func.plot_interact_ax(
-        ax=ax,
-        explanations_all=expl,
-        times=times,
-        data_x=data_x,
-        model=model,
-        idx_plot=idx,
-        ylabel="Attribution $\hat{S}(t|x)$",
-        label_fontsize=16,
-        tick_fontsize=14,
-        smooth=True,
-        smooth_window=50,
-        smooth_poly=1, 
-        title=title
-    )
-    handles_all.extend(h)
-    labels_all.extend(l)
-
-# Remove duplicates
-unique = dict(zip(labels_all, handles_all))
-
-# One shared legend at the bottom
-fig.legend(
-    unique.values(),
-    unique.keys(),
-    loc="lower center",
-    ncol=4,
-    fontsize=14
-)
-
-# Adjust layout to leave space for legend
-plt.tight_layout(rect=[0, 0.08, 1, 1])
-
-# Save the figure
-save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_combined/plot_td_cox.pdf"
-fig.savefig(save_path, bbox_inches="tight")
-
-############## TIME-INDEPENDENCE EXPERIMENTS
-# Create figure
-fig, axes = plt.subplots(2, 2, figsize=(15, 12), sharex=True)
-
-# Initialize lists to collect all handles and labels
-handles_all, labels_all = [], []
-
-# Plot each subplot and collect handles/labels
-for ax, expl, times, data_x, surv_fn, title, ytext in zip(
-    axes.flat,
-    [explanation_linear_ti_haz[0],
-     explanation_genadd_ti_haz[0],
-     explanation_add_ti_loghaz[0],
-     explanation_linear_ti_surv[0]],
+    [model_gbsa_linear_ti,
+     model_gbsa_linear_tdmain,
+     model_gbsa_linear_ti_inter,
+     model_gbsa_linear_tdmain_inter,
+     model_gbsa_linear_tdinter,
+     model_gbsa_genadd_ti,
+     model_gbsa_genadd_tdmain,
+     model_gbsa_genadd_ti_inter,
+     model_gbsa_genadd_tdmain_inter,
+     model_gbsa_genadd_tdinter],
     [model_gbsa_linear_ti.unique_times_[::5],
+     model_gbsa_linear_tdmain.unique_times_[::5],
+     model_gbsa_linear_ti_inter.unique_times_[::5],
+     model_gbsa_linear_tdmain_inter.unique_times_[::5],
+     model_gbsa_linear_tdinter.unique_times_[::5],
      model_gbsa_genadd_ti.unique_times_[::5],
-     model_gbsa_add_ti.unique_times_[::5],
-     model_gbsa_linear_ti.unique_times_[::5]],
-    [data_x_linear_ti, data_x_genadd_ti, data_x_add_ti, data_x_genadd_ti],
-    [hazard_wrap_linear_ti, hazard_wrap_genadd_ti, log_hazard_wrap_add_ti, surv_from_hazard_linear_ti_wrap],
-    ["GT: Linear RF", "GT: General Additive RF", "GT: Additive RF", "GT: Linear RF"],
-    ["Attribution $h(t|x)$", "Attribution $h(t|x)$", "Attribution $\log(h(t|x))$", "Attribution $S(t|x)$"]
-    
+     model_gbsa_genadd_tdmain.unique_times_[::5],
+     model_gbsa_genadd_ti_inter.unique_times_[::5],
+     model_gbsa_genadd_tdmain_inter.unique_times_[::5],
+     model_gbsa_genadd_tdinter.unique_times_[::5]],
+    [data_x_linear_ti, data_x_linear_tdmain, data_x_linear_ti_inter,
+     data_x_linear_tdmain_inter, data_x_linear_tdinter,
+     data_x_genadd_ti, data_x_genadd_tdmain, data_x_genadd_ti_inter,
+     data_x_genadd_tdmain_inter, data_x_genadd_tdinter],
+    ["(1) GT: Linear G(t|x) TI", "(2) GT: Linear G(t|x) TD Main",
+     "(3) GT: Linear G(t|x) TI Inter", "(4) GT: Linear G(t|x) TD Main Inter",
+     "(5) GT: Linear G(t|x) TD Inter", "(6) GT: General Additive G(t|x) TI",
+     "(7) GT: General Additive G(t|x) TD Main",
+     "(8) GT: General Additive G(t|x) TI Inter",
+     "(9) GT: General Additive G(t|x) TD Main Inter",
+     "(10) GT: General Additive G(t|x) TD Inter"]
+):
+    h, l = survshapiq_func.plot_interact_ax(
+        ax=ax,
+        explanations_all=expl,
+        model=model,
+        times = times, 
+        data_x=data_x,
+        compare_plots="Diff",
+        idx_plot=idx,
+        ylabel="Attribution $\hat{S}(t|x)$",
+        label_fontsize=16,
+        tick_fontsize=14,
+        smooth=True,
+        smooth_window=50,
+        smooth_poly=1,
+        title=title,
+    )
+    handles_all.extend(h)
+    labels_all.extend(l)
+
+
+# Remove duplicates
+unique = dict(zip(labels_all, handles_all))
+
+# One shared legend at the bottom
+fig.legend(
+    unique.values(),
+    unique.keys(),
+    loc="lower center",
+    ncol=4,
+    fontsize=14
+)
+
+# Adjust layout to leave space for legend
+plt.tight_layout(rect=[0, 0.04, 1, 1])
+
+# Save the figure
+save_path = f"{path_plots_combined}/plot_gbsa_surv.pdf"
+fig.savefig(save_path, bbox_inches="tight")
+
+############## COXPH SURVIVAL
+# Create figure
+fig, axes = plt.subplots(5, 2, figsize=(14, 18), sharex=True)
+axes = axes.flatten()  
+
+handles_all, labels_all = [], []
+
+for ax, expl, model, times, data_x, title in zip(
+    axes,
+    [explanation_linear_ti_cox[0],
+     explanation_linear_tdmain_cox[0],
+     explanation_linear_ti_inter_cox[0],
+     explanation_linear_tdmain_inter_cox[0],
+     explanation_linear_tdinter_cox[0],
+     explanation_genadd_ti_cox[0],
+     explanation_genadd_tdmain_cox[0],
+     explanation_genadd_ti_inter_cox[0],
+     explanation_genadd_tdmain_inter_cox[0],
+     explanation_genadd_tdinter_cox[0]],
+    [model_cox_linear_ti,
+     model_cox_linear_tdmain,
+     model_cox_linear_ti_inter,
+     model_cox_linear_tdmain_inter,
+     model_cox_linear_tdinter,
+     model_cox_genadd_ti,
+     model_cox_genadd_tdmain,
+     model_cox_genadd_ti_inter,
+     model_cox_genadd_tdmain_inter,
+     model_cox_genadd_tdinter],
+    [model_cox_linear_ti.unique_times_[::5],
+     model_cox_linear_tdmain.unique_times_[::5],
+     model_cox_linear_ti_inter.unique_times_[::5],
+     model_cox_linear_tdmain_inter.unique_times_[::5],
+     model_cox_linear_tdinter.unique_times_[::5],
+     model_cox_genadd_ti.unique_times_[::5],
+     model_cox_genadd_tdmain.unique_times_[::5],
+     model_cox_genadd_ti_inter.unique_times_[::5],
+     model_cox_genadd_tdmain_inter.unique_times_[::5],
+     model_cox_genadd_tdinter.unique_times_[::5]],
+    [data_x_linear_ti, data_x_linear_tdmain, data_x_linear_ti_inter,
+     data_x_linear_tdmain_inter, data_x_linear_tdinter,
+     data_x_genadd_ti, data_x_genadd_tdmain, data_x_genadd_ti_inter,
+     data_x_genadd_tdmain_inter, data_x_genadd_tdinter],
+    ["(1) GT: Linear G(t|x) TI", "(2) GT: Linear G(t|x) TD Main",
+     "(3) GT: Linear G(t|x) TI Inter", "(4) GT: Linear G(t|x) TD Main Inter",
+     "(5) GT: Linear G(t|x) TD Inter", "(6) GT: General Additive G(t|x) TI",
+     "(7) GT: General Additive G(t|x) TD Main",
+     "(8) GT: General Additive G(t|x) TI Inter",
+     "(9) GT: General Additive G(t|x) TD Main Inter",
+     "(10) GT: General Additive G(t|x) TD Inter"]
+):
+    h, l = survshapiq_func.plot_interact_ax(
+        ax=ax,
+        explanations_all=expl,
+        model=model,
+        times = times, 
+        data_x=data_x,
+        compare_plots="Diff",
+        idx_plot=idx,
+        ylabel="Attribution $\hat{S}(t|x)$",
+        label_fontsize=16,
+        tick_fontsize=14,
+        smooth=True,
+        smooth_window=50,
+        smooth_poly=1,
+        title=title,
+    )
+    handles_all.extend(h)
+    labels_all.extend(l)
+
+
+# Remove duplicates
+unique = dict(zip(labels_all, handles_all))
+
+# One shared legend at the bottom
+fig.legend(
+    unique.values(),
+    unique.keys(),
+    loc="lower center",
+    ncol=4,
+    fontsize=14
+)
+
+# Adjust layout to leave space for legend
+plt.tight_layout(rect=[0, 0.04, 1, 1])
+
+# Save the figure
+save_path = f"{path_plots_combined}/plot_coxph_surv.pdf"
+fig.savefig(save_path, bbox_inches="tight")
+
+######## OVERVIEW PLOT
+# Create figure
+fig, axes = plt.subplots(2, 3, figsize=(12, 8), sharex=True)
+axes = axes.flatten()  
+
+handles_all, labels_all = [], []
+
+for ax, smooth_w, expl, times, data_x, surv_fn, title, yaxis_lab in zip(
+    axes,
+    [100, 100, 50, 100, 100, 50],
+    [explanation_genadd_tdmain_inter_loghaz[0],
+     explanation_linear_ti_haz[0],
+     explanation_linear_ti_surv[0],
+     explanation_genadd_tdinter_loghaz[0],
+     explanation_linear_tdmain_inter_haz[0],
+     explanation_genadd_ti_inter_surv[0]],
+    [model_gbsa_genadd_tdmain_inter.unique_times_[::5],
+     model_gbsa_linear_ti.unique_times_[::5],
+     model_gbsa_linear_ti.unique_times_[::5],
+     model_gbsa_genadd_tdinter.unique_times_[::5],
+     model_gbsa_linear_tdmain_inter.unique_times_[::5],
+     model_gbsa_genadd_ti_inter.unique_times_[::5]],
+    [data_x_genadd_tdmain_inter, data_x_linear_ti, data_x_linear_ti,
+     data_x_genadd_tdinter, data_x_linear_tdmain_inter, data_x_genadd_ti_inter],
+    [log_hazard_wrap_genadd_tdmain_inter, hazard_wrap_linear_ti, surv_from_hazard_linear_ti_wrap, 
+     log_hazard_wrap_genadd_tdinter, hazard_wrap_linear_ti, surv_from_hazard_genadd_ti_inter_wrap],
+    ["Scenario (9)", "Scenario (1)", "Scenario (1)", "Scenario (10)", "Scenario (4)", "Scenario (8)"],
+    ["Attribution $\log(h(t|x))$", "Attribution $h(t|x)$", "Attribution $S(t|x)$",
+     "Attribution $\log(h(t|x))$", "Attribution $h(t|x)$", "Attribution $S(t|x)$"]
 ):
     h, l = survshapiq_func.plot_interact_ax(
         ax=ax,
@@ -2055,17 +2575,19 @@ for ax, expl, times, data_x, surv_fn, title, ytext in zip(
         times=times,
         data_x=data_x,
         survival_fn=surv_fn,
+        compare_plots="Diff",
         idx_plot=idx,
-        ylabel=ytext,
+        ylabel=yaxis_lab,
         label_fontsize=16,
         tick_fontsize=14,
         smooth=True,
-        smooth_window=100,
+        smooth_window=smooth_w,
         smooth_poly=1,
-        title=title
+        title=title,
     )
     handles_all.extend(h)
     labels_all.extend(l)
+
 
 # Remove duplicates
 unique = dict(zip(labels_all, handles_all))
@@ -2083,108 +2605,47 @@ fig.legend(
 plt.tight_layout(rect=[0, 0.08, 1, 1])
 
 # Save the figure
-save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_combined/plot_ti_exp.pdf"
+save_path = f"{path_plots_combined}/plot_overview_sim.pdf"
 fig.savefig(save_path, bbox_inches="tight")
 
-
-############## TIME-DEPENDENCE EXPERIMENTS (LOG)HAZARD
+############## MODELS PLOTS
 # Create figure
-fig, axes = plt.subplots(1, 2, figsize=(14, 6), sharex=True)
+fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharex=True)
+axes = axes.flatten()  
 
-# Initialize lists to collect all handles and labels
 handles_all, labels_all = [], []
 
-# Plot each subplot and collect handles/labels
-for ax, expl, times, data_x, surv_fn, title, ytext in zip(
-    axes.flat,
-    [explanation_linear_tdmain_haz[0],
-     explanation_linear_tdmain_loghaz[0]],
-    [model_gbsa_linear_tdmain.unique_times_[::5],
-     model_gbsa_linear_tdmain.unique_times_[::5]],
-    [data_x_linear_tdmain, data_x_linear_tdmain],
-    [hazard_wrap_linear_tdmain, log_hazard_wrap_genadd_tdmain],
-    ["GT: Linear RF TD Main Effect", "GT: Linear RF TD Main Effect"],
-    ["Attribution $h(t|x)$", "Attribution $\log(h(t|x))$"]
-    
-):
-    h, l = survshapiq_func.plot_interact_ax(
-        ax=ax,
-        explanations_all=expl,
-        times=times,
-        data_x=data_x,
-        survival_fn=surv_fn,
-        idx_plot=idx,
-        ylabel=ytext,
-        label_fontsize=16,
-        tick_fontsize=14,
-        smooth=True,
-        smooth_window=100,
-        smooth_poly=1,
-        title=title
-    )
-    handles_all.extend(h)
-    labels_all.extend(l)
-
-# Remove duplicates
-unique = dict(zip(labels_all, handles_all))
-
-# One shared legend at the bottom
-fig.legend(
-    unique.values(),
-    unique.keys(),
-    loc="lower center",
-    ncol=4,
-    fontsize=14
-)
-
-# Adjust layout to leave space for legend
-plt.tight_layout(rect=[0, 0.16, 1, 1])
-
-# Save the figure
-save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_combined/plot_td_exp_loghaz.pdf"
-fig.savefig(save_path, bbox_inches="tight")
-
-############## TIME-DEPENDENCE EXPERIMENTS (LOG)HAZARD
-# Create figure
-fig, axes = plt.subplots(1, 3, figsize=(17, 6), sharex=True)
-
-# Initialize lists to collect all handles and labels
-handles_all, labels_all = [], []
-
-# Plot each subplot and collect handles/labels
-for ax, expl, times, data_x, surv_fn, title, ytext, model in zip(
-    axes.flat,
-    [explanation_genadd_tdinter_surv[0],
-     explanation_genadd_tdinter_gbsa[0],
-     explanation_genadd_tdinter_cox[0]],
-    [model_gbsa_genadd_tdinter.unique_times_[::5],
-     model_gbsa_genadd_tdinter.unique_times_[::5],
-     model_gbsa_genadd_tdinter.unique_times_[::5]],
-    [data_x_genadd_tdinter, data_x_genadd_tdinter, data_x_genadd_tdinter],
-    [surv_from_hazard_genadd_tdinter_wrap, None, None],
-    ["GT: General Additive RF TD Interaction", "GBSA: General Additive RF TD Interaction", "CoxPH: General Additive RF TD Interaction"],
-    ["Attribution $S(t|x)$", "Attribution $\hat{S}(t|x)$", "Attribution $\hat{S}(t|x)$"],
-    [None, model_gbsa_genadd_tdinter, model_cox_genadd_tdinter]
-    
+for ax, expl, model, times, data_x, title in zip(
+    axes,
+    [explanation_genadd_ti_inter_cox[0],
+     explanation_genadd_ti_inter_gbsa[0]],
+    [model_cox_genadd_ti_inter,
+     model_gbsa_genadd_ti_inter],
+    [model_cox_genadd_ti_inter.unique_times_[::5],
+     model_gbsa_genadd_ti_inter.unique_times_[::5]],
+    [data_x_genadd_ti_inter, data_x_genadd_ti_inter],
+    ["CoxPH: Scenario (8)",
+     "GBSA: Scenario (8)"]
 ):
     h, l = survshapiq_func.plot_interact_ax(
         ax=ax,
         explanations_all=expl,
         model=model,
-        times=times,
+        times = times, 
         data_x=data_x,
-        survival_fn=surv_fn,
+        compare_plots="Diff",
         idx_plot=idx,
-        ylabel=ytext,
+        ylabel="Attribution $\hat{S}(t|x)$",
         label_fontsize=16,
         tick_fontsize=14,
         smooth=True,
-        smooth_window=100,
+        smooth_window=50,
         smooth_poly=1,
-        title=title
+        title=title,
     )
     handles_all.extend(h)
     labels_all.extend(l)
+
 
 # Remove duplicates
 unique = dict(zip(labels_all, handles_all))
@@ -2199,8 +2660,8 @@ fig.legend(
 )
 
 # Adjust layout to leave space for legend
-plt.tight_layout(rect=[0, 0.16, 1, 1])
+plt.tight_layout(rect=[0, 0.14, 1, 1])
 
 # Save the figure
-save_path = "/home/slangbei/survshapiq/survshapiq/simulation/plots_combined/plot_td_exp_surv.pdf"
+save_path = f"{path_plots_combined}/plot_sim_models.pdf"
 fig.savefig(save_path, bbox_inches="tight")
