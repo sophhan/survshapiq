@@ -4,11 +4,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import importlib
 import os
-import simulation.survshapiq_func as survshapiq_func
-importlib.reload(survshapiq_func) 
-from sklearn.model_selection import train_test_split
-from sksurv.linear_model import CoxPHSurvivalAnalysis
 from collections import OrderedDict
+import simulation.func as func
+importlib.reload(func) 
 
 # path settings
 path_data = "/home/slangbei/survshapiq/survshapiq/simulation/data"
@@ -40,17 +38,17 @@ datasets1 = [
     {"name": "GT h(t|x)",
      "exp_file": f"{path_exp}/hazard_attributions_linear_ti.csv",
      "data_file": f"{path_data}/1_simdata_linear_ti.csv",
-     "survival_fn": hazard_wrap_linear_ti,
+     "survival_fn": func.hazard_wrap_linear_ti,
      "model": None},
     {"name": "GT log(h(t|x))",
      "exp_file": f"{path_exp}/log_hazard_attributions_linear_ti.csv",
      "data_file": f"{path_data}/1_simdata_linear_ti.csv",
-     "survival_fn": log_hazard_wrap_linear_ti,
+     "survival_fn": func.log_hazard_wrap_linear_ti,
      "model": None},
     {"name": "GT S(t|x)",
      "exp_file": f"{path_exp}/survival_attributions_linear_ti.csv",
      "data_file": f"{path_data}/1_simdata_linear_ti.csv",
-     "survival_fn": surv_from_hazard_linear_ti_wrap,
+     "survival_fn": func.surv_from_hazard_linear_ti_wrap,
      "model": None},
     {"name": "CoxPH S(t|x)",
      "exp_file": f"{path_exp}/cox_attributions_linear_ti.csv",
@@ -69,7 +67,7 @@ datasets1 = [
 def process_dataset(cfg):
     explanations_all = pd.read_csv(cfg["exp_file"])
     data_df = pd.read_csv(cfg["data_file"])
-    return survshapiq_func.compute_local_accuracy(
+    return func.compute_local_accuracy(
         explanations_all,
         data_df,
         survival_fn=cfg.get("survival_fn"),
@@ -109,17 +107,17 @@ datasets2 = [
     {"name": "GT h(t|x)",
      "exp_file": f"{path_exp}/hazard_attributions_linear_tdmain.csv",
      "data_file": f"{path_data}/2_simdata_linear_tdmain.csv",
-     "survival_fn": hazard_wrap_linear_tdmain,
+     "survival_fn": func.hazard_wrap_linear_tdmain,
      "model": None},
     {"name": "GT log(h(t|x))",
      "exp_file": f"{path_exp}/log_hazard_attributions_linear_tdmain.csv",
      "data_file": f"{path_data}/2_simdata_linear_tdmain.csv",
-     "survival_fn": log_hazard_wrap_linear_tdmain,
+     "survival_fn": func.log_hazard_wrap_linear_tdmain,
      "model": None},
     {"name": "GT S(t|x): Linear G(t|x) TD Main",
      "exp_file": f"{path_exp}/survival_attributions_linear_tdmain.csv",
      "data_file": f"{path_data}/2_simdata_linear_tdmain.csv",
-     "survival_fn": surv_from_hazard_linear_tdmain_wrap,
+     "survival_fn": func.surv_from_hazard_linear_tdmain_wrap,
      "model": None},
     {"name": "CoxPH S(t|x)",
      "exp_file": f"{path_exp}/cox_attributions_linear_tdmain.csv",
@@ -138,7 +136,7 @@ datasets2 = [
 def process_dataset(cfg):
     explanations_all = pd.read_csv(cfg["exp_file"])
     data_df = pd.read_csv(cfg["data_file"])
-    return survshapiq_func.compute_local_accuracy(
+    return func.compute_local_accuracy(
         explanations_all,
         data_df,
         survival_fn=cfg.get("survival_fn"),
@@ -178,17 +176,17 @@ datasets3 = [
     {"name": "GT h(t|x)",
      "exp_file": f"{path_exp}/hazard_attributions_linear_ti_inter.csv",
      "data_file": f"{path_data}/3_simdata_linear_ti_inter.csv",
-     "survival_fn": hazard_wrap_linear_ti_inter,
+     "survival_fn": func.hazard_wrap_linear_ti_inter,
      "model": None},
     {"name": "GT log(h(t|x))",
      "exp_file": f"{path_exp}/log_hazard_attributions_linear_ti_inter.csv",
      "data_file": f"{path_data}/3_simdata_linear_ti_inter.csv",
-     "survival_fn": log_hazard_wrap_linear_ti_inter,
+     "survival_fn": func.log_hazard_wrap_linear_ti_inter,
      "model": None},
     {"name": "GT S(t|x)",
      "exp_file": f"{path_exp}/survival_attributions_linear_ti_inter.csv",
      "data_file": f"{path_data}/3_simdata_linear_ti_inter.csv",
-     "survival_fn": surv_from_hazard_linear_ti_inter_wrap,
+     "survival_fn": func.surv_from_hazard_linear_ti_inter_wrap,
      "model": None},
     {"name": "CoxPH S(t|x)",
      "exp_file": f"{path_exp}/cox_attributions_linear_ti_inter.csv",
@@ -207,7 +205,7 @@ datasets3 = [
 def process_dataset(cfg):
     explanations_all = pd.read_csv(cfg["exp_file"])
     data_df = pd.read_csv(cfg["data_file"])
-    return survshapiq_func.compute_local_accuracy(
+    return func.compute_local_accuracy(
         explanations_all,
         data_df,
         survival_fn=cfg.get("survival_fn"),
@@ -247,17 +245,17 @@ datasets4 = [
     {"name": "GT h(t|x)",
      "exp_file": f"{path_exp}/hazard_attributions_linear_tdmain_inter.csv",
      "data_file": f"{path_data}/4_simdata_linear_tdmain_inter.csv",
-     "survival_fn": hazard_wrap_linear_tdmain_inter,
+     "survival_fn": func.hazard_wrap_linear_tdmain_inter,
      "model": None},
     {"name": "GT log(h(t|x))",
      "exp_file": f"{path_exp}/log_hazard_attributions_linear_tdmain_inter.csv",
      "data_file": f"{path_data}/4_simdata_linear_tdmain_inter.csv",
-     "survival_fn": log_hazard_wrap_linear_tdmain_inter,
+     "survival_fn": func.log_hazard_wrap_linear_tdmain_inter,
      "model": None},
     {"name": "GT S(t|x)",
      "exp_file": f"{path_exp}/survival_attributions_linear_tdmain_inter.csv",
      "data_file": f"{path_data}/4_simdata_linear_tdmain_inter.csv",
-     "survival_fn": surv_from_hazard_linear_tdmain_inter_wrap,
+     "survival_fn": func.surv_from_hazard_linear_tdmain_inter_wrap,
      "model": None},
     {"name": "CoxPH S(t|x)",
      "exp_file": f"{path_exp}/cox_attributions_linear_tdmain_inter.csv",
@@ -276,7 +274,7 @@ datasets4 = [
 def process_dataset(cfg):
     explanations_all = pd.read_csv(cfg["exp_file"])
     data_df = pd.read_csv(cfg["data_file"])
-    return survshapiq_func.compute_local_accuracy(
+    return func.compute_local_accuracy(
         explanations_all,
         data_df,
         survival_fn=cfg.get("survival_fn"),
@@ -316,17 +314,17 @@ datasets5 = [
     {"name": "GT h(t|x)",
      "exp_file": f"{path_exp}/hazard_attributions_linear_tdinter.csv",
      "data_file": f"{path_data}/5_simdata_linear_tdinter.csv",
-     "survival_fn": hazard_wrap_linear_tdinter,
+     "survival_fn": func.hazard_wrap_linear_tdinter,
      "model": None},
     {"name": "GT log(h(t|x))",
      "exp_file": f"{path_exp}/log_hazard_attributions_linear_tdinter.csv",
      "data_file": f"{path_data}/5_simdata_linear_tdinter.csv",
-     "survival_fn": log_hazard_wrap_linear_tdinter,
+     "survival_fn": func.log_hazard_wrap_linear_tdinter,
      "model": None},
     {"name": "GT S(t|x)",
      "exp_file": f"{path_exp}/survival_attributions_linear_tdinter.csv",
      "data_file": f"{path_data}/5_simdata_linear_tdinter.csv",
-     "survival_fn": surv_from_hazard_linear_tdinter_wrap,
+     "survival_fn": func.surv_from_hazard_linear_tdinter_wrap,
      "model": None},
     {"name": "CoxPH S(t|x)",
      "exp_file": f"{path_exp}/cox_attributions_linear_tdinter.csv",
@@ -345,7 +343,7 @@ datasets5 = [
 def process_dataset(cfg):
     explanations_all = pd.read_csv(cfg["exp_file"])
     data_df = pd.read_csv(cfg["data_file"])
-    return survshapiq_func.compute_local_accuracy(
+    return func.compute_local_accuracy(
         explanations_all,
         data_df,
         survival_fn=cfg.get("survival_fn"),
@@ -386,17 +384,17 @@ datasets6 = [
     {"name": "GT h(t|x)",
      "exp_file": f"{path_exp}/hazard_attributions_genadd_ti.csv",
      "data_file": f"{path_data}/6_simdata_genadd_ti.csv",
-     "survival_fn": hazard_wrap_genadd_ti,
+     "survival_fn": func.hazard_wrap_genadd_ti,
      "model": None},
     {"name": "GT log(h(t|x))",
      "exp_file": f"{path_exp}/log_hazard_attributions_genadd_ti.csv",
      "data_file": f"{path_data}/6_simdata_genadd_ti.csv",
-     "survival_fn": log_hazard_wrap_genadd_ti,
+     "survival_fn": func.log_hazard_wrap_genadd_ti,
      "model": None},
     {"name": "GT S(t|x)",
      "exp_file": f"{path_exp}/survival_attributions_genadd_ti.csv",
      "data_file": f"{path_data}/6_simdata_genadd_ti.csv",
-     "survival_fn": surv_from_hazard_genadd_ti_wrap,
+     "survival_fn": func.surv_from_hazard_genadd_ti_wrap,
      "model": None},
     {"name": "CoxPH S(t|x)",
      "exp_file": f"{path_exp}/cox_attributions_genadd_ti.csv",
@@ -415,7 +413,7 @@ datasets6 = [
 def process_dataset(cfg):
     explanations_all = pd.read_csv(cfg["exp_file"])
     data_df = pd.read_csv(cfg["data_file"])
-    return survshapiq_func.compute_local_accuracy(
+    return func.compute_local_accuracy(
         explanations_all,
         data_df,
         survival_fn=cfg.get("survival_fn"),
@@ -455,17 +453,17 @@ datasets7 = [
     {"name": "GT h(t|x)",
      "exp_file": f"{path_exp}/hazard_attributions_genadd_tdmain.csv",
      "data_file": f"{path_data}/7_simdata_genadd_tdmain.csv",
-     "survival_fn": hazard_wrap_genadd_tdmain,
+     "survival_fn": func.hazard_wrap_genadd_tdmain,
      "model": None},
     {"name": "GT log(h(t|x))",
      "exp_file": f"{path_exp}/log_hazard_attributions_genadd_tdmain.csv",
      "data_file": f"{path_data}/7_simdata_genadd_tdmain.csv",
-     "survival_fn": log_hazard_wrap_genadd_tdmain,
+     "survival_fn": func.log_hazard_wrap_genadd_tdmain,
      "model": None},
     {"name": "GT S(t|x)",
      "exp_file": f"{path_exp}/survival_attributions_genadd_tdmain.csv",
      "data_file": f"{path_data}/7_simdata_genadd_tdmain.csv",
-     "survival_fn": surv_from_hazard_genadd_tdmain_wrap,
+     "survival_fn": func.surv_from_hazard_genadd_tdmain_wrap,
      "model": None},
     {"name": "CoxPH S(t|x)",
      "exp_file": f"{path_exp}/cox_attributions_genadd_tdmain.csv",
@@ -484,7 +482,7 @@ datasets7 = [
 def process_dataset(cfg):
     explanations_all = pd.read_csv(cfg["exp_file"])
     data_df = pd.read_csv(cfg["data_file"])
-    return survshapiq_func.compute_local_accuracy(
+    return func.compute_local_accuracy(
         explanations_all,
         data_df,
         survival_fn=cfg.get("survival_fn"),
@@ -525,17 +523,17 @@ datasets8 = [
     {"name": "GT h(t|x)",
      "exp_file": f"{path_exp}/hazard_attributions_genadd_ti_inter.csv",
      "data_file": f"{path_data}/8_simdata_genadd_ti_inter.csv",
-     "survival_fn": hazard_wrap_genadd_ti_inter,
+     "survival_fn": func.hazard_wrap_genadd_ti_inter,
      "model": None},
     {"name": "GT log(h(t|x))",
      "exp_file": f"{path_exp}/log_hazard_attributions_genadd_ti_inter.csv",
      "data_file": f"{path_data}/8_simdata_genadd_ti_inter.csv",
-     "survival_fn": log_hazard_wrap_genadd_ti_inter,
+     "survival_fn": func.log_hazard_wrap_genadd_ti_inter,
      "model": None},
     {"name": "GT S(t|x)",
      "exp_file": f"{path_exp}/survival_attributions_genadd_ti_inter.csv",
      "data_file": f"{path_data}/8_simdata_genadd_ti_inter.csv",
-     "survival_fn": surv_from_hazard_genadd_ti_inter_wrap,
+     "survival_fn": func.surv_from_hazard_genadd_ti_inter_wrap,
      "model": None},
     {"name": "CoxPH S(t|x)",
      "exp_file": f"{path_exp}/cox_attributions_genadd_ti_inter.csv",
@@ -554,7 +552,7 @@ datasets8 = [
 def process_dataset(cfg):
     explanations_all = pd.read_csv(cfg["exp_file"])
     data_df = pd.read_csv(cfg["data_file"])
-    return survshapiq_func.compute_local_accuracy(
+    return func.compute_local_accuracy(
         explanations_all,
         data_df,
         survival_fn=cfg.get("survival_fn"),
@@ -595,17 +593,17 @@ datasets9 = [
     {"name": "GT h(t|x)",
      "exp_file": f"{path_exp}/hazard_attributions_genadd_tdmain_inter.csv",
      "data_file": f"{path_data}/9_simdata_genadd_tdmain_inter.csv",
-     "survival_fn": hazard_wrap_genadd_tdmain_inter,
+     "survival_fn": func.hazard_wrap_genadd_tdmain_inter,
      "model": None},
     {"name": "GT log(h(t|x))",
      "exp_file": f"{path_exp}/log_hazard_attributions_genadd_tdmain_inter.csv",
      "data_file": f"{path_data}/9_simdata_genadd_tdmain_inter.csv",
-     "survival_fn": log_hazard_wrap_genadd_tdmain_inter,
+     "survival_fn": func.log_hazard_wrap_genadd_tdmain_inter,
      "model": None},
     {"name": "GT S(t|x)",
      "exp_file": f"{path_exp}/survival_attributions_genadd_tdmain_inter.csv",
      "data_file": f"{path_data}/9_simdata_genadd_tdmain_inter.csv",
-     "survival_fn": surv_from_hazard_genadd_tdmain_inter_wrap,
+     "survival_fn": func.surv_from_hazard_genadd_tdmain_inter_wrap,
      "model": None},
     {"name": "CoxPH S(t|x)",
      "exp_file": f"{path_exp}/cox_attributions_genadd_tdmain_inter.csv",
@@ -624,7 +622,7 @@ datasets9 = [
 def process_dataset(cfg):
     explanations_all = pd.read_csv(cfg["exp_file"])
     data_df = pd.read_csv(cfg["data_file"])
-    return survshapiq_func.compute_local_accuracy(
+    return func.compute_local_accuracy(
         explanations_all,
         data_df,
         survival_fn=cfg.get("survival_fn"),
@@ -665,17 +663,17 @@ datasets10 = [
     {"name": "GT h(t|x)",
      "exp_file": f"{path_exp}/hazard_attributions_genadd_tdinter.csv",
      "data_file": f"{path_data}/10_simdata_genadd_tdinter.csv",
-     "survival_fn": hazard_wrap_genadd_tdinter,
+     "survival_fn": func.hazard_wrap_genadd_tdinter,
      "model": None},
     {"name": "GT log(h(t|x))",
      "exp_file": f"{path_exp}/log_hazard_attributions_genadd_tdinter.csv",
      "data_file": f"{path_data}/10_simdata_genadd_tdinter.csv",
-     "survival_fn": log_hazard_wrap_genadd_tdinter,
+     "survival_fn": func.log_hazard_wrap_genadd_tdinter,
      "model": None},
     {"name": "GT S(t|x)",
      "exp_file": f"{path_exp}/survival_attributions_genadd_tdinter.csv",
      "data_file": f"{path_data}/10_simdata_genadd_tdinter.csv",
-     "survival_fn": surv_from_hazard_genadd_tdinter_wrap,
+     "survival_fn": func.surv_from_hazard_genadd_tdinter_wrap,
      "model": None},
     {"name": "CoxPH S(t|x)",
      "exp_file": f"{path_exp}/cox_attributions_genadd_tdinter.csv",
@@ -694,7 +692,7 @@ datasets10 = [
 def process_dataset(cfg):
     explanations_all = pd.read_csv(cfg["exp_file"])
     data_df = pd.read_csv(cfg["data_file"])
-    return survshapiq_func.compute_local_accuracy(
+    return func.compute_local_accuracy(
         explanations_all,
         data_df,
         survival_fn=cfg.get("survival_fn"),
@@ -725,8 +723,11 @@ if __name__ == "__main__":
     plt.close()
     print(results_avg)
 
-
-########### COMBINED PLOTS
+#--------------------------------------
+#---------------------------
+# COMBINED PLOTS
+#---------------------------
+#--------------------------------------
 
 # Collect all datasets lists
 all_datasets = [datasets1, datasets2, datasets3, datasets4, datasets5,
