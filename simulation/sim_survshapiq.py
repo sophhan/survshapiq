@@ -11,6 +11,9 @@ import importlib
 import simulation.func as func
 importlib.reload(func)
 
+import os
+print(os.getcwd())
+
 # define paths
 path_data = "/home/slangbei/survshapiq/survshapiq/simulation/data"
 path_plots = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory"

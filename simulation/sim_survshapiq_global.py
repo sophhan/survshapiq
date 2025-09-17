@@ -745,7 +745,7 @@ explanation_df_hazard.to_csv(f"{path_explanations}/hazard_attributions_genadd_ti
 explanations_log_hazard = func.survshapiq_ground_truth_parallel(
     data_x=data_x_full,
     x_new_list=data_x_full,
-    survival_from_hazard_func=func.log_hazard_func_genadd_tdmain,
+    survival_from_hazard_func=func.log_hazard_wrap_genadd_tdmain,
     times=model_gbsa.unique_times_,
     time_stride=time_stride,
     budget=2**8,
@@ -764,7 +764,7 @@ explanation_df_log_hazard.to_csv("/home/slangbei/survshapiq/survshapiq/simulatio
 explanations_surv = func.survshapiq_ground_truth_parallel(
     data_x=data_x_full,
     x_new_list=data_x_full,
-    survival_from_hazard_func=func.surv_from_hazard_genadd_ti,
+    survival_from_hazard_func=func.surv_from_hazard_genadd_ti_wrap,
     times=model_gbsa.unique_times_,
     time_stride=time_stride,
     budget=2**8,
@@ -890,7 +890,7 @@ explanation_df_log_hazard.to_csv(f"{path_explanations}/log_hazard_attributions_g
 explanations_surv = func.survshapiq_ground_truth_parallel(
     data_x=data_x_full,
     x_new_list=data_x_full,
-    survival_from_hazard_func=func.surv_from_hazard_genadd_tdmain,
+    survival_from_hazard_func=func.surv_from_hazard_genadd_tdmain_wrap,
     times=model_gbsa.unique_times_,
     time_stride=time_stride,
     budget=2**8,
