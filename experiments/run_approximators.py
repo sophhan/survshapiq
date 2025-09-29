@@ -35,7 +35,7 @@ X_train = X_train.loc[:, X_train.columns.str.startswith("s__num_")]
 X_train.columns = X_train.columns.str.replace("s__num_", "")
 
 # %%
-model = RandomSurvivalForest(max_depth=6, n_estimators=200, oob_score=True, random_state=SEED)
+model = RandomSurvivalForest(max_depth=3, n_estimators=100, oob_score=True, random_state=SEED)
 model.fit(X=X_train.values, y=So)
 print(model.oob_score_, model.score(X_train.values, So))
 
@@ -46,7 +46,7 @@ ground_truth = src.survshapiq(
     X_train.values, 
     [X_train.iloc[[i]] for i in range(0, X_train.shape[0])],
     feature_names=X_train.columns,
-    n_timepoints=21,
+    n_timepoints=41,
     exact=True, 
     index="k-SII"
 )
@@ -58,8 +58,9 @@ with open(filename, 'wb') as f:
 
 
 # %%
-def compute_error(exp, gt):
-    return np.sum([(exp[i] - gt[i]).abs().sum().sum() for i in range(len(exp))]).item()
+def compute_error(exp, gt, frac=0.9):
+    take_k = int(frac * exp[0].shape[0])
+    return np.sum([(exp[i].iloc[:take_k,] - gt[i].iloc[:take_k,]).abs().sum().sum() for i in range(len(exp))]).item()
 
 # %%
 result = pd.DataFrame({'approximator': [], 'budget': [], 'error': []})
@@ -72,14 +73,14 @@ for approximator in ["montecarlo", "svarm", "permutation", "regression"]:
             X_train.values, 
             [X_train.iloc[[i]] for i in range(0, X_train.shape[0])], 
             feature_names=X_train.columns,
-            n_timepoints=21,
+            n_timepoints=41,
             exact=False, 
             budget=budget,
             index="k-SII",
             approximator=approximator
         )
 
-        error = compute_error(explanations, ground_truth)
+        error = compute_error(explanations, ground_truth, frac=0.9)
 
         result = pd.concat([result, pd.DataFrame({
             'approximator': [approximator], 
@@ -88,7 +89,7 @@ for approximator in ["montecarlo", "svarm", "permutation", "regression"]:
         })])
 
 #%%
-result.to_csv(f'results/{ds_name}_approximators.csv', index=False)
+result.assign(seed=SEED).to_csv(f'results/{ds_name}_approximators_{SEED}.csv', index=False)
 
 # %%
 ax = sns.lineplot(result, x="budget", y="error", hue="approximator")
@@ -97,7 +98,7 @@ ax.set_yscale('log', base=2)
 plt.grid(True, which="both", ls="--")
 plt.title(f'dataset = {ds_name} | benchmark of approximators (k-SII)')
 plt.tight_layout()
-plt.savefig(f'results/{ds_name}_approximators.png', bbox_inches="tight")
+plt.savefig(f'results/{ds_name}_approximators_{SEED}.png', bbox_inches="tight")
 
 # %%
 plt.clf()
