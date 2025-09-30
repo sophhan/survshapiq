@@ -1,4 +1,11 @@
+import argparse
+parser = argparse.ArgumentParser(description='main')
+parser.add_argument('--seed', type=int)
+args = parser.parse_args()
+SEED = args.seed
+
 # %% Imports
+import random
 import pickle
 import numpy as np
 import pandas as pd
@@ -13,8 +20,8 @@ import seaborn as sns
 
 import src
 
-SEED = 1234
 np.random.seed(SEED)
+random.seed(SEED)
 
 
 # %% Data
@@ -41,6 +48,7 @@ print(model.oob_score_, model.score(X_train.values, So))
 
 # %%
 np.random.seed(SEED)
+random.seed(SEED)
 ground_truth = src.survshapiq(
     model, 
     X_train.values, 
@@ -52,7 +60,7 @@ ground_truth = src.survshapiq(
 )
 
 # %%
-filename = f'results/{ds_name}_approximators_gt.pkl'
+filename = f'results/{ds_name}_approximators_gt_{SEED}.pkl'
 with open(filename, 'wb') as f:
     pickle.dump(ground_truth, f)
 
@@ -68,6 +76,7 @@ result = pd.DataFrame({'approximator': [], 'budget': [], 'error': []})
 for approximator in ["montecarlo", "svarm", "permutation", "regression"]:
     for budget in [2**5, 2**6, 2**7, 2**8, 2**9]:
         np.random.seed(SEED)
+        random.seed(SEED)
         explanations = src.survshapiq(
             model, 
             X_train.values, 
@@ -92,13 +101,14 @@ for approximator in ["montecarlo", "svarm", "permutation", "regression"]:
 result.assign(seed=SEED).to_csv(f'results/{ds_name}_approximators_{SEED}.csv', index=False)
 
 # %%
-ax = sns.lineplot(result, x="budget", y="error", hue="approximator")
-ax.set_xscale('log', base=2)
-ax.set_yscale('log', base=2)
-plt.grid(True, which="both", ls="--")
-plt.title(f'dataset = {ds_name} | benchmark of approximators (k-SII)')
-plt.tight_layout()
-plt.savefig(f'results/{ds_name}_approximators_{SEED}.png', bbox_inches="tight")
+# fig, ax = plt.subplots(figsize=(5, 3.5))
+# ax = sns.lineplot(result, x="budget", y="error", hue="approximator", ax=ax)
+# ax.set_xscale('log', base=2)
+# ax.set_yscale('log', base=2)
+# plt.grid(True, which="both", ls="--")
+# plt.title(f'dataset = {ds_name} | order = 2 | index = k-SII')
+# plt.tight_layout()
+# plt.savefig(f'results/{ds_name}_approximators_{SEED}.png', bbox_inches="tight")
 
 # %%
 plt.clf()
