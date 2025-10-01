@@ -32,7 +32,11 @@ sel_num = make_column_selector(pattern='^num\\_')
 enc_df = ColumnTransformer(transformers=[('s', enc_num, sel_num)])
 enc_df.set_output(transform='pandas')
 
-ds_name = "Bergamaschi"
+# ds_name = "Bergamaschi"
+# ds_name = "smarto"
+# ds_name = "support2"
+ds_name = "phpl04K8a"
+print(f'======== {ds_name}: {SEED}', flush=True)
 df = loader.load_dataset(ds_name=ds_name)['df'].set_index("pid")
 senc = Surv()
 So = senc.from_arrays(df['event'].astype(bool), df['time'])
@@ -40,11 +44,22 @@ enc_df.fit(df)
 X_train = enc_df.transform(df)
 X_train = X_train.loc[:, X_train.columns.str.startswith("s__num_")]
 X_train.columns = X_train.columns.str.replace("s__num_", "")
+X_train = X_train.iloc[:, :16]
 
 # %%
-model = RandomSurvivalForest(max_depth=3, n_estimators=100, oob_score=True, random_state=SEED)
+model = RandomSurvivalForest(max_depth=3, n_estimators=100, oob_score=True, random_state=123)
 model.fit(X=X_train.values, y=So)
 print(model.oob_score_, model.score(X_train.values, So))
+
+## %%
+np.random.seed(123)
+random.seed(123)
+n_samples = 20
+if X_train.shape[0] > n_samples:
+    X_explain = X_train.sample(n_samples)
+else:
+    n_samples = X_train.shape[0]
+    X_explain = X_train
 
 # %%
 np.random.seed(SEED)
@@ -52,11 +67,12 @@ random.seed(SEED)
 ground_truth = src.survshapiq(
     model, 
     X_train.values, 
-    [X_train.iloc[[i]] for i in range(0, X_train.shape[0])],
+    [X_explain.iloc[[i]] for i in range(0, X_explain.shape[0])],
     feature_names=X_train.columns,
-    n_timepoints=41,
+    n_timepoints=11,
     exact=True, 
-    index="k-SII"
+    index="k-SII",
+    imputer="baseline"
 )
 
 # %%
@@ -74,18 +90,20 @@ def compute_error(exp, gt, frac=0.9):
 result = pd.DataFrame({'approximator': [], 'budget': [], 'error': []})
 
 for approximator in ["montecarlo", "svarm", "permutation", "regression"]:
-    for budget in [2**5, 2**6, 2**7, 2**8, 2**9]:
+    for budget in [2**9, 2**10, 2**11, 2**12, 2**13]:
+        print(f'---- {approximator}: {budget}', flush=True)
         np.random.seed(SEED)
         random.seed(SEED)
         explanations = src.survshapiq(
             model, 
             X_train.values, 
-            [X_train.iloc[[i]] for i in range(0, X_train.shape[0])], 
+            [X_explain.iloc[[i]] for i in range(0, X_explain.shape[0])], 
             feature_names=X_train.columns,
-            n_timepoints=41,
+            n_timepoints=11,
             exact=False, 
             budget=budget,
             index="k-SII",
+            imputer="baseline",
             approximator=approximator
         )
 
@@ -109,6 +127,4 @@ result.assign(seed=SEED).to_csv(f'results/{ds_name}_approximators_{SEED}.csv', i
 # plt.title(f'dataset = {ds_name} | order = 2 | index = k-SII')
 # plt.tight_layout()
 # plt.savefig(f'results/{ds_name}_approximators_{SEED}.png', bbox_inches="tight")
-
-# %%
-plt.clf()
+# plt.clf()

@@ -2,12 +2,13 @@
 
 #SBATCH --job-name=shapiq
 #SBATCH --array=0-29
-#SBATCH --cpus-per-task=3
+#SBATCH --cpus-per-task=2
 #SBATCH --mem-per-cpu=16G
 #SBATCH --output=sbatch_logs/log_%A_%a.log
-#SBATCH --partition=short
-#SBATCH --time=00-12:00:00
+#SBATCH --partition=short,experimental
+#SBATCH --time=00-23:00:00
 #SBATCH --account=mi2lab-normal
+#SBATCH --exclude=dgx-2
 
 set -e
 hostname; pwd; date

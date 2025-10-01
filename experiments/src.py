@@ -60,7 +60,20 @@ def get_evenly_spaced_integers(numbers: list[int], k: int) -> list[int]:
     return result
 
 
-def survshapiq(model, data_x, x_new_list, n_timepoints=20, budget=2**8, max_order=2, approximator=None, index=None, exact=True,  feature_names=None):
+def survshapiq(
+        model, 
+        data_x, 
+        x_new_list, 
+        n_timepoints=20, 
+        budget=2**8, 
+        max_order=2, 
+        approximator=None, 
+        index=None, 
+        exact=True, 
+        feature_names=None, 
+        imputer="marginal",
+        sample_size=80
+    ):
     """
     Explain interaction effects at different time points for a survival model.
 
@@ -94,13 +107,17 @@ def survshapiq(model, data_x, x_new_list, n_timepoints=20, budget=2**8, max_orde
                                                     max_order=max_order,
                                                     approximator=approximator,
                                                     index=index,
-                                                    sample_size=80)
+                                                    imputer=imputer,
+                                                    # sample_size=sample_size
+                                                    )
             elif exact:
                 explainer = shapiq.TabularExplainer(model=model_at_time_t,
                                                     data=data_x,
                                                     max_order=max_order,
                                                     exact=True,
-                                                    sample_size=80)
+                                                    imputer=imputer,
+                                                    # sample_size=sample_size
+                                                    )
             else:
                 raise ValueError("Must either provide both 'index' and 'approximator', or set exact=True.")
 

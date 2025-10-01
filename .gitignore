@@ -1,5 +1,6 @@
 .DS_Store
 **/__pycache__/**
+**/sbatch_logs/**
 
 # Generated explanations and plots
 survshapiq/simulation/explanations/
