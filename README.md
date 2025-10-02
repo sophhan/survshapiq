@@ -11,8 +11,10 @@ cd shapiq .
 pip install .
 ```
 
-Explain the models with `explain_actg.ipynb` and `explain_uvealmelanoma.ipynb`.
+### Section 5.2: Experiments with real world data
 
-Run approximator benchmark with `sbatch run_approximators_benchmark.sh` (see `run_approximators_benchmark.py`).
+Explain the models with `experiments/explain_actg.ipynb` and `experiments/explain_uvealmelanoma.ipynb`.
 
-Plot the results with `plot_approximators_benchmark.ipynb`.
+Run approximator benchmark with `sbatch experiments/run_approximators_benchmark.sh` (see `experiments/run_approximators_benchmark.py`).
+
+Plot the benchmark results with `experiments/plot_approximators_benchmark.ipynb`.
