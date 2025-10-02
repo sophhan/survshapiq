@@ -1,24 +1,2 @@
-.DS_Store
+**.DS_Store
 **/__pycache__/**
-**/sbatch_logs/**
-
-# Generated explanations and plots
-survshapiq/simulation/explanations/
-survshapiq/metabrics/explanations/
-survshapiq/metabrics/plots/
-survshapiq/flchain/explanations/
-survshapiq/flchain/plots/
-survshapiq/gbsg/explanations/
-survshapiq/gbsg/plots/
-survshapiq/support/explanations/
-survshapiq/support/plots/
-
-# Ignore all files starting with simdata in simulation folder
-survshapiq/simulation/simdata*
-
-# Ignore all folders starting with plots anywhere
-**/plots*/x__pycache__/
-*.pyc
-plots*/
-explanations*/
-simulation/simdata*

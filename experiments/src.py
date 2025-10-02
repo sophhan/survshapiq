@@ -101,25 +101,44 @@ def survshapiq(
             which_timepoint_equals_t = np.where(model.unique_times_ == t)[0][0].item()
             model_at_time_t = lambda d: model.predict_survival_function(d, return_array=True)[:, which_timepoint_equals_t]
 
-            if index is not None and approximator is not None:
-                explainer = shapiq.TabularExplainer(model=model_at_time_t,
-                                                    data=data_x,
-                                                    max_order=max_order,
-                                                    approximator=approximator,
-                                                    index=index,
-                                                    imputer=imputer,
-                                                    # sample_size=sample_size
-                                                    )
-            elif exact:
-                explainer = shapiq.TabularExplainer(model=model_at_time_t,
-                                                    data=data_x,
-                                                    max_order=max_order,
-                                                    exact=True,
-                                                    imputer=imputer,
-                                                    # sample_size=sample_size
-                                                    )
+            if imputer == "baseline":
+                if index is not None and approximator is not None:
+                    explainer = shapiq.TabularExplainer(model=model_at_time_t,
+                                                        data=data_x,
+                                                        max_order=max_order,
+                                                        approximator=approximator,
+                                                        index=index,
+                                                        imputer=imputer
+                                                        )
+                elif exact:
+                    explainer = shapiq.TabularExplainer(model=model_at_time_t,
+                                                        data=data_x,
+                                                        max_order=max_order,
+                                                        exact=True,
+                                                        imputer=imputer
+                                                        )
+                else:
+                    raise ValueError("Must either provide both 'index' and 'approximator', or set exact=True.")
             else:
-                raise ValueError("Must either provide both 'index' and 'approximator', or set exact=True.")
+                if index is not None and approximator is not None:
+                    explainer = shapiq.TabularExplainer(model=model_at_time_t,
+                                                        data=data_x,
+                                                        max_order=max_order,
+                                                        approximator=approximator,
+                                                        index=index,
+                                                        imputer=imputer,
+                                                        sample_size=sample_size
+                                                        )
+                elif exact:
+                    explainer = shapiq.TabularExplainer(model=model_at_time_t,
+                                                        data=data_x,
+                                                        max_order=max_order,
+                                                        exact=True,
+                                                        imputer=imputer,
+                                                        sample_size=sample_size
+                                                        )
+                else:
+                    raise ValueError("Must either provide both 'index' and 'approximator', or set exact=True.")
 
             interaction_values = explainer.explain(x_new, budget=budget)
             explanations[t] = interaction_values
