@@ -2,13 +2,10 @@
 
 Supplementary code for the AISTATS 2026 conference submission number 1322.
 
-Create environment and install the modified shapiq package (based on version 1.3.1).
+Create environment with the modified shapiq package (based on version 1.3.1).
 
 ```
 conda env create -f env.yml
-conda activate survshapiq
-cd shapiq .
-pip install .
 ```
 
 ### Section 5.2: Experiments with real world data
