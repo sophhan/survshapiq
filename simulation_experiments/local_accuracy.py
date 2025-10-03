@@ -9,10 +9,10 @@ import simulation.func as func
 importlib.reload(func) 
 
 # path settings
-path_data = "/home/slangbei/survshapiq/survshapiq/simulation/data"
-path_exp = "/home/slangbei/survshapiq/survshapiq/simulation/explanations"
-path_combined = "/home/slangbei/survshapiq/survshapiq/simulation/plots_la/"
-path_result = "/home/slangbei/survshapiq/survshapiq/simulation/plots_combined/"
+path_data = "/simulation_experiments/data"
+path_exp = "/simulation_experiments/simulation/explanations"
+path_combined = "/simulation_experiments/simulation/plots_la/"
+path_result = "/simulation_experiments/simulation/plots_combined/"
 
 
 # --- Global style settings ---
