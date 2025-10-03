@@ -18,8 +18,8 @@ import func as func
 # global configurations
 SEED = 1234
 np.random.seed(SEED)
-path_data = "/home/slangbei/survshapiq/survshapiq/simulation/data/"
-path_explanations = "/home/slangbei/survshapiq/survshapiq/simulation/explanations/"
+path_data = "simulation_experiments/simulation/data/"
+path_explanations = "simulation_experiments/explanations/"
 
 #---------------------------
 # 1) Linear G(t|x), TI (no interactions)
@@ -757,7 +757,7 @@ explanations_log_hazard = func.survshapiq_ground_truth_parallel(
 
 # generate final annotated DataFrames, plots and save dataframes with explanations
 explanation_df_log_hazard = func.annotate_explanations(explanations_log_hazard, sample_idxs=range(len(data_x_full)), time_stride=time_stride)
-explanation_df_log_hazard.to_csv("/home/slangbei/survshapiq/survshapiq/simulation/explanations/log_hazard_attributions_genadd_ti.csv", index=False)
+explanation_df_log_hazard.to_csv(f"{path_explanations}/log_hazard_attributions_genadd_ti.csv", index=False)
 
 # SURVIVAL
 # get all explanations in parallel for all observations
@@ -1223,7 +1223,7 @@ explanations_gbsa = func.survshapiq_parallel(
 
 # generate final annotated DataFrames, plots and save dataframes with explanations
 explanation_df_gbsa = func.annotate_explanations(explanations_gbsa, model_gbsa, sample_idxs=range(len(data_x_full)), time_stride=time_stride)
-explanation_df_gbsa.to_csv("/home/slangbei/survshapiq/survshapiq/simulation/explanations/gbsa_attributions_genadd_tdinter.csv", index=False)
+explanation_df_gbsa.to_csv(f"{path_explanations}/gbsa_attributions_genadd_tdinter.csv", index=False)
 
 # HAZARD
 # get all explanations in parallel for all observations

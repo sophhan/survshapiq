@@ -3,7 +3,7 @@ library(simsurv)
 library(survival)
 
 # define file path to save simulated datasets
-path <- "/home/slangbei/survshapiq/survshapiq/simulation/data/"
+path <- "/simulation/data/"
 
 #---------------------------
 # 1) Linear G(t|x), TI (no interactions)

@@ -15,9 +15,9 @@ import os
 print(os.getcwd())
 
 # define paths
-path_data = "/home/slangbei/survshapiq/survshapiq/simulation/data"
-path_plots = "/home/slangbei/survshapiq/survshapiq/simulation/plots_theory"
-path_plots_combined = "/home/slangbei/survshapiq/survshapiq/simulation/plots_combined"
+path_data = "/simulation/data"
+path_plots = "/simulation/plots_theory"
+path_plots_combined = "/simulation/plots_combined"
 
 #---------------------------
 # 1) Linear G(t|x), TI (no interactions)
