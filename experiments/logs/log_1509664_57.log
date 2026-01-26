@@ -1,0 +1,7 @@
+After loading the module, please run source to the CONDA_SOURCE variable.
+Task ID: 57
+sr-1.eden
+Mon Jan 12 10:03:40 CET 2026
+train score: 0.9541 | OOB score: 0.7261
+  0%|          | 0/1 [00:00<?, ?it/s]100%|██████████| 1/1 [7:17:17<00:00, 26237.29s/it]100%|██████████| 1/1 [7:17:17<00:00, 26237.32s/it]
+Mon Jan 12 17:21:29 CET 2026

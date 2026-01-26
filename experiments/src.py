@@ -127,24 +127,21 @@ def survshapiq(
         # Aggregate
         explanation_dict = {}
 
-        for features, _ in interaction_values.dict_values.items():
-            if len(features) == 0:
-                continue
-            if len(features) == 1:
-                explanation_dict[feature_names[features[0]]] = []
-            if len(features) == 2:
-                new_feature_name = f'{feature_names[features[0]]} * {feature_names[features[1]]}'
-                explanation_dict[new_feature_name] = []
-
         for t, iv in explanations.items():
             for features, value in iv.dict_values.items():
                 if len(features) == 0:
                     continue
                 if len(features) == 1:
-                    explanation_dict[feature_names[features[0]]].append(value)
+                    if feature_names[features[0]] not in explanation_dict:
+                        explanation_dict[feature_names[features[0]]] = [value]
+                    else:
+                        explanation_dict[feature_names[features[0]]].append(value)
                 if len(features) == 2:
                     new_feature_name = f'{feature_names[features[0]]} * {feature_names[features[1]]}'
-                    explanation_dict[new_feature_name].append(value)
+                    if new_feature_name not in explanation_dict:
+                        explanation_dict[new_feature_name] = [value]
+                    else:
+                        explanation_dict[new_feature_name].append(value)
 
         explanation_df = pd.DataFrame(explanation_dict)
         explanations_all.append(explanation_df)

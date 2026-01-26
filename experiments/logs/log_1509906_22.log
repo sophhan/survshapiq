@@ -1,0 +1,7 @@
+After loading the module, please run source to the CONDA_SOURCE variable.
+Task ID: 22
+hopper
+Tue Jan 13 04:21:35 CET 2026
+train score: 0.9541 | OOB score: 0.7261
+  0%|          | 0/1 [00:00<?, ?it/s]100%|██████████| 1/1 [15:35:40<00:00, 56140.58s/it]100%|██████████| 1/1 [15:35:40<00:00, 56140.66s/it]
+Tue Jan 13 19:57:59 CET 2026

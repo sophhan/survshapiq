@@ -1,0 +1,8 @@
+After loading the module, please run source to the CONDA_SOURCE variable.
+Task ID: 60
+dgx-4.eden
+Sun Jan 11 17:47:47 CET 2026
+train score: 0.9531 | OOB score: 0.7049
+  0%|          | 0/1 [00:00<?, ?it/s]100%|██████████| 1/1 [1:07:16<00:00, 4036.41s/it]100%|██████████| 1/1 [1:07:16<00:00, 4036.41s/it]
+  0%|          | 0/1 [00:00<?, ?it/s]100%|██████████| 1/1 [1:10:25<00:00, 4225.12s/it]100%|██████████| 1/1 [1:10:25<00:00, 4225.13s/it]
+Sun Jan 11 20:05:38 CET 2026

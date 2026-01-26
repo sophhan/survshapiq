@@ -1,0 +1,6 @@
+After loading the module, please run source to the CONDA_SOURCE variable.
+Task ID: 40
+hopper
+Mon Jan 12 02:48:51 CET 2026
+train score: 0.9541 | OOB score: 0.7261
+  0%|          | 0/1 [00:00<?, ?it/s]slurmstepd: error: *** JOB 1509611 ON hopper CANCELLED AT 2026-01-12T14:48:51 DUE TO TIME LIMIT ***

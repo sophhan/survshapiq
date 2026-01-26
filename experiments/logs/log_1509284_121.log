@@ -1,0 +1,7 @@
+After loading the module, please run source to the CONDA_SOURCE variable.
+Task ID: 121
+dgx-1
+Sun Jan 11 18:26:11 CET 2026
+train score: 0.9531 | OOB score: 0.7049
+  0%|          | 0/1 [00:00<?, ?it/s]100%|██████████| 1/1 [5:32:21<00:00, 19941.67s/it]100%|██████████| 1/1 [5:32:21<00:00, 19941.70s/it]
+  0%|          | 0/1 [00:00<?, ?it/s]slurmstepd: error: *** JOB 1509451 ON dgx-1 CANCELLED AT 2026-01-12T01:26:33 DUE TO TIME LIMIT ***
