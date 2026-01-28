@@ -102,7 +102,6 @@ func.plot_interact(explanations_all = explanation_marg_loghaz,
                               smooth_window=100,
                               smooth_poly=1) 
 
-print("success")
 
 # conditional
 explanation_cond_loghaz = func.survshapiq_ground_truth(data_x_marg, 
@@ -132,5 +131,3 @@ func.plot_interact(explanations_all = explanation_cond_loghaz,
                               smooth=True,
                               smooth_window=100,
                               smooth_poly=1) 
-
-print("success")
