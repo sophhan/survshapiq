@@ -1,3 +1,5 @@
 **.DS_Store
 **/__pycache__/**
 **/.vscode/**
+*experiments_tcga-brca/data/
+experiments_tcga-brca/.venv/
