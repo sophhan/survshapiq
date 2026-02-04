@@ -2,7 +2,7 @@
 
 Supplementary code for the ICML 2026 conference submission number 1322.
 
-### Section 5.1: Experiments with simulated data
+### Section 4.1: Experiments with simulated data
 
 Create environment with the modified shapiq package (based on version 1.3.1).
 
@@ -17,7 +17,7 @@ Run experiments on randomly selected observation and plot results with `simulati
 Obtain full explanations for simualted datasets with `simulation_experiments/sim_survshapiq_global.py` (results in `simulation_experiments/experiments`) and compute local accuracy results with `simulation_experiments/local_accuracy.py`.
 
 
-### Section 5.2: Experiments with real world data
+### Section 4.2: Experiments with real world data
 
 Create environment with the modified shapiq package (based on version 1.3.1).
 
@@ -30,3 +30,8 @@ Explain the models with `experiments/explain_actg.ipynb` and `experiments/explai
 Run approximator benchmark with `sbatch experiments/run_approximators_benchmark.sh` (see `experiments/run_approximators_benchmark.py`).
 
 Plot the benchmark results with `experiments/plot_approximators_benchmark.ipynb`.
+
+### Section 4.2: Multi-modal TCGA-BRCA
+
+See the `experiments_tcga-brca` directory for code and instructions to reproduce 
+the experiments on the TCGA-BRCA dataset.
