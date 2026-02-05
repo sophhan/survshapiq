@@ -11,7 +11,7 @@ This repository reproduces the TCGA-BRCA survival analysis with Shapley interact
 
 **Model:** Gated Attention MIL + DeepHit for discrete-time survival prediction
 
-**Features:**
+**Players:**
 - 6 top-attention patches (image modality)
 - 8 clinical features (tabular modality)
 
@@ -35,7 +35,7 @@ The dataset is downloaded from [Kaggle](https://www.kaggle.com/datasets/jmalagon
 The UNI2-h encoder requires HuggingFace access:
 
 1. Create an account at https://huggingface.co
-2. Request access to the [UNI model](https://huggingface.co/MahmoodLab/UNI)
+2. Request access to the [UNI2-h model](https://huggingface.co/MahmoodLab/UNI2-h))
 3. Create an access token and replace `YOUR_HF_TOKEN` in `01_data_preprocessing.ipynb`
 
 ## Running the Notebooks
@@ -55,7 +55,7 @@ A pre-trained model checkpoint is included in `checkpoints/final_model.pt`. You 
 
 ### Note on Reproducibility
 
-Due to random patch sampling during training (data augmentation), re-training the model may produce slightly different results.
+Due to running on a GPU, extracting the features and re-training the model may produce slightly different results.
 
 Expected performance:
 - **Test C-index:** ~0.738
