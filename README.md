@@ -1,6 +1,12 @@
-## Functional Decomposition and Shapley Interactions for Interpreting Survival Models
+## SurvSHAP-IQ [ICML 2026]
 
-Supplementary code for the ICML 2026 conference submission number 1322.
+This repository is a code supplement to the following [paper](https://openreview.net/forum?id=SldP4LGjdz):
+
+> S. H. Langbein, H. Baniecki, F. Fumagalli, N. Koenen, M. N. Wright, J. Herbinger. **Functional Decomposition and Shapley Interactions for Interpreting Survival Models**. *ICML 2026*
+
+**TL;DR:** We introduce a principled framework based on functional decomposition and Shapley values to explain time-dependent feature interactions in machine learning survival models.
+
+[![](assets/poster.png)](assets/poster.pdf)
 
 ### Section 4.1: Experiments with simulated data
 
